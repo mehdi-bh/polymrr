@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inconsolata } from "next/font/google";
+import { Navbar } from "@/components/layout/navbar";
 import "./globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const inconsolata = Inconsolata({ variable: "--font-inconsolata", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Polymrr",
-  description: "Polymrr",
+  title: "PolyMRR — Prediction Markets for Indie Startups",
+  description: "Bet on real indie startup outcomes. Markets powered by TrustMRR verified revenue data.",
 };
 
 export default function RootLayout({
@@ -16,9 +16,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {children}
+    <html lang="en" data-theme="polymrr">
+      <body className={`${inconsolata.variable} font-sans antialiased`}>
+        <Navbar />
+        <main className="mx-auto max-w-7xl px-4 py-8">{children}</main>
       </body>
     </html>
   );
