@@ -1,15 +1,17 @@
 "use client";
 
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { getMrrHistory, formatCents } from "@/lib/data";
+import { formatCents } from "@/lib/helpers";
+import type { MrrSnapshot } from "@/lib/types";
 
 interface MrrChartProps {
   slug: string;
+  data: MrrSnapshot[];
   height?: number;
 }
 
-export function MrrChart({ slug, height = 200 }: MrrChartProps) {
-  const data = getMrrHistory(slug).map((s) => ({
+export function MrrChart({ slug, data: rawData, height = 200 }: MrrChartProps) {
+  const data = rawData.map((s) => ({
     date: new Date(s.date).toLocaleDateString("en-US", { month: "short" }),
     mrr: s.mrr,
   }));

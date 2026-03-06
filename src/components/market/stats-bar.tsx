@@ -1,7 +1,7 @@
 import { getGlobalStats, formatCents } from "@/lib/data";
 
-export function StatsBar() {
-  const stats = getGlobalStats();
+export async function StatsBar() {
+  const stats = await getGlobalStats();
 
   const items = [
     { label: "Open Markets", value: stats.openMarkets.toString() },

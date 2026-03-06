@@ -13,22 +13,43 @@ import Image from "next/image";
 import { Credits } from "@/components/ui/credits";
 import { Clock, TrendingUp } from "lucide-react";
 
-export default function DashboardPage() {
-  const user = getCurrentUser();
+export default async function DashboardPage() {
+  const user = await getCurrentUser();
   if (!user) redirect("/");
 
-  const userBets = getBetsForUser(user.id);
-  const activeBets = userBets.filter((b) => getMarketById(b.marketId)?.status === "open");
+  const userBets = await getBetsForUser(user.id);
 
-  const closingSoon = getOpenMarkets()
+  const marketCache = new Map<string, Awaited<ReturnType<typeof getMarketById>>>();
+  const startupCache = new Map<string, Awaited<ReturnType<typeof getStartupBySlug>>>();
+
+  for (const b of userBets) {
+    if (!marketCache.has(b.marketId)) {
+      marketCache.set(b.marketId, await getMarketById(b.marketId));
+    }
+    const market = marketCache.get(b.marketId);
+    if (market && !startupCache.has(market.startupSlug)) {
+      startupCache.set(market.startupSlug, await getStartupBySlug(market.startupSlug));
+    }
+  }
+
+  const activeBets = userBets.filter((b) => marketCache.get(b.marketId)?.status === "open");
+
+  const openMarkets = await getOpenMarkets();
+  const closingSoon = openMarkets
     .filter((m) => daysUntil(m.closesAt) <= 7)
     .sort((a, b) => new Date(a.closesAt).getTime() - new Date(b.closesAt).getTime());
 
   const userMarketIds = new Set(userBets.map((b) => b.marketId));
-  const recommended = getOpenMarkets()
+  const recommended = openMarkets
     .filter((m) => !userMarketIds.has(m.id))
     .sort((a, b) => b.totalBettors - a.totalBettors)
     .slice(0, 4);
+
+  for (const m of [...closingSoon, ...recommended]) {
+    if (!startupCache.has(m.startupSlug)) {
+      startupCache.set(m.startupSlug, await getStartupBySlug(m.startupSlug));
+    }
+  }
 
   return (
     <div className="space-y-6 animate-fade-up">
@@ -54,8 +75,8 @@ export default function DashboardPage() {
         {activeBets.length > 0 ? (
           <div className="space-y-2">
             {activeBets.map((bet) => {
-              const market = getMarketById(bet.marketId);
-              const startup = market ? getStartupBySlug(market.startupSlug) : null;
+              const market = marketCache.get(bet.marketId);
+              const startup = market ? startupCache.get(market.startupSlug) : null;
               if (!market || !startup) return null;
 
               const oddsNow = bet.side === "yes" ? market.yesOdds : 100 - market.yesOdds;
@@ -97,7 +118,10 @@ export default function DashboardPage() {
             Closing Soon <span className="mono-num text-sm font-normal text-base-content/50">({closingSoon.length})</span>
           </h2>
           <div className="stagger-children grid gap-4 sm:grid-cols-2">
-            {closingSoon.map((m) => <MarketCard key={m.id} market={m} />)}
+            {closingSoon.map((m) => {
+              const s = startupCache.get(m.startupSlug);
+              return s ? <MarketCard key={m.id} market={m} startup={s} /> : null;
+            })}
           </div>
         </div>
       )}
@@ -106,7 +130,10 @@ export default function DashboardPage() {
         <div className="space-y-3">
           <h2 className="text-lg font-bold">Recommended</h2>
           <div className="stagger-children grid gap-4 sm:grid-cols-2">
-            {recommended.map((m) => <MarketCard key={m.id} market={m} />)}
+            {recommended.map((m) => {
+              const s = startupCache.get(m.startupSlug);
+              return s ? <MarketCard key={m.id} market={m} startup={s} /> : null;
+            })}
           </div>
         </div>
       )}

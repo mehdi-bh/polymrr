@@ -1,12 +1,12 @@
-import Link from "next/link";
-import { getStartupsByFounder, getMarketsForStartup, formatCents } from "@/lib/data";
-import type { Cofounder } from "@/lib/types";
+import { formatCents } from "@/lib/helpers";
+import type { Cofounder, Startup, Market } from "@/lib/types";
 import { XIcon } from "@/components/ui/x-icon";
 
 interface FounderCardProps {
   founder: Cofounder;
   xFollowerCount: number | null;
-  currentStartupSlug: string;
+  allStartups: Startup[];
+  allMarkets: Market[];
 }
 
 function getFounderTier(totalMrr: number): { label: string; color: string; border: string; glow: string } {
@@ -16,12 +16,13 @@ function getFounderTier(totalMrr: number): { label: string; color: string; borde
   return { label: "RISING", color: "text-base-content/60", border: "border-base-300", glow: "" };
 }
 
-export function FounderCard({ founder, xFollowerCount, currentStartupSlug }: FounderCardProps) {
+export function FounderCard({ founder, xFollowerCount, allStartups, allMarkets }: FounderCardProps) {
   const name = founder.xName ?? founder.xHandle;
-  const allStartups = getStartupsByFounder(founder.xHandle);
   const totalMrr = allStartups.reduce((sum, s) => sum + s.revenue.mrr, 0);
-  const totalMarkets = allStartups.reduce((sum, s) => sum + getMarketsForStartup(s.slug).filter((m) => m.status === "open").length, 0);
-  const avgGrowth = allStartups.reduce((sum, s) => sum + (s.growth30d ?? 0), 0) / allStartups.length;
+  const totalMarkets = allMarkets.filter((m) => m.status === "open").length;
+  const avgGrowth = allStartups.length > 0
+    ? allStartups.reduce((sum, s) => sum + (s.growth30d ?? 0), 0) / allStartups.length
+    : 0;
   const totalRevenue = allStartups.reduce((sum, s) => sum + s.revenue.total, 0);
   const tier = getFounderTier(totalMrr);
 
@@ -91,14 +92,6 @@ export function FounderCard({ founder, xFollowerCount, currentStartupSlug }: Fou
 
         {/* Divider */}
         <div className="h-px w-full bg-base-300" />
-
-        {/* View profile link */}
-        <Link
-          href={`/profile/${founder.xHandle}`}
-          className={`text-xs font-bold uppercase tracking-wider ${tier.color} hover:brightness-125 transition-all`}
-        >
-          View Founder Profile
-        </Link>
 
         {/* Bet on founder (coming soon) */}
         <div className="relative w-full">

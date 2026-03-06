@@ -1,19 +1,17 @@
 import Link from "next/link";
 import { OddsBar } from "./odds-bar";
-import { getStartupBySlug, daysUntil, formatCents } from "@/lib/data";
+import { daysUntil, formatCents } from "@/lib/helpers";
 import { Credits } from "@/components/ui/credits";
 import { ShareMarketButton } from "./share-market-button";
-import type { Market } from "@/lib/types";
+import type { Market, Startup } from "@/lib/types";
 import { Clock, Users } from "lucide-react";
 
 interface MarketCardProps {
   market: Market;
+  startup: Startup;
 }
 
-export function MarketCard({ market }: MarketCardProps) {
-  const startup = getStartupBySlug(market.startupSlug);
-  if (!startup) return null;
-
+export function MarketCard({ market, startup }: MarketCardProps) {
   const days = daysUntil(market.closesAt);
   const closingSoon = days <= 10;
 

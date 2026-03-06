@@ -1,15 +1,15 @@
 import Link from "next/link";
-import { formatCents, getMarketsForStartup, getStartupSentiment } from "@/lib/data";
+import { formatCents } from "@/lib/helpers";
 import type { Startup } from "@/lib/types";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
 interface StartupCardProps {
   startup: Startup;
+  activeMarketCount: number;
+  sentiment: number;
 }
 
-export function StartupCard({ startup }: StartupCardProps) {
-  const activeMarkets = getMarketsForStartup(startup.slug).filter((m) => m.status === "open");
-  const sentiment = getStartupSentiment(startup.slug);
+export function StartupCard({ startup, activeMarketCount, sentiment }: StartupCardProps) {
   const growthPositive = (startup.growth30d ?? 0) >= 0;
 
   return (
@@ -54,7 +54,7 @@ export function StartupCard({ startup }: StartupCardProps) {
         </div>
 
         <div className="mt-auto flex items-center justify-between text-xs text-base-content/50">
-          <span>{activeMarkets.length} active market{activeMarkets.length !== 1 ? "s" : ""}</span>
+          <span>{activeMarketCount} active market{activeMarketCount !== 1 ? "s" : ""}</span>
           <span className={`mono-num font-semibold ${sentiment >= 50 ? "text-yes" : "text-no"}`}>
             {sentiment}% bullish
           </span>

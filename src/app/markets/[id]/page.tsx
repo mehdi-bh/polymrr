@@ -8,6 +8,8 @@ import {
   getStartupBySlug,
   getBetsForMarket,
   getUserById,
+  getMrrHistory,
+  getCurrentUser,
   formatCents,
   daysUntil,
   timeAgo,
@@ -29,13 +31,25 @@ const typeLabels: Record<string, string> = {
 
 export default async function MarketPage({ params }: PageProps) {
   const { id } = await params;
-  const market = getMarketById(id);
+  const market = await getMarketById(id);
   if (!market) notFound();
 
-  const startup = getStartupBySlug(market.startupSlug);
+  const startup = await getStartupBySlug(market.startupSlug);
   if (!startup) notFound();
 
-  const recentBets = getBetsForMarket(market.id);
+  const [recentBets, mrrData, user] = await Promise.all([
+    getBetsForMarket(market.id),
+    getMrrHistory(startup.slug),
+    getCurrentUser(),
+  ]);
+
+  const betUsers = new Map<string, Awaited<ReturnType<typeof getUserById>>>();
+  for (const bet of recentBets) {
+    if (!betUsers.has(bet.userId)) {
+      betUsers.set(bet.userId, await getUserById(bet.userId));
+    }
+  }
+
   const days = daysUntil(market.closesAt);
 
   return (
@@ -90,7 +104,7 @@ export default async function MarketPage({ params }: PageProps) {
           </div>
 
           {market.status === "open" && (
-            <BetForm marketId={market.id} yesOdds={market.yesOdds} />
+            <BetForm marketId={market.id} yesOdds={market.yesOdds} user={user} />
           )}
         </div>
       </div>
@@ -119,7 +133,7 @@ export default async function MarketPage({ params }: PageProps) {
           <div className="card bg-base-100 border border-base-300">
             <div className="card-body p-5">
               <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-base-content/50">MRR History</h3>
-              <MrrChart slug={startup.slug} height={180} />
+              <MrrChart slug={startup.slug} data={mrrData} height={180} />
             </div>
           </div>
         </div>
@@ -131,15 +145,15 @@ export default async function MarketPage({ params }: PageProps) {
               {recentBets.length > 0 ? (
                 <div className="space-y-3">
                   {recentBets.map((bet) => {
-                    const betUser = getUserById(bet.userId);
+                    const betUser = betUsers.get(bet.userId);
                     return (
                       <div key={bet.id} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Link
-                            href={`/profile/${betUser?.xHandle}`}
+                            href={`/profile/${bet.userId}`}
                             className="text-[13px] font-semibold text-primary hover:underline"
                           >
-                            @{betUser?.xHandle}
+                            {betUser?.xHandle ? `@${betUser.xHandle}` : betUser?.xName ?? "Anon"}
                           </Link>
                           <Credits amount={bet.amount} size="xs" className="text-base-content/50" />
                           <span className={`badge badge-xs ${

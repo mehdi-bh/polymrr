@@ -1,37 +1,61 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
-  getUserByXHandle,
+  getCurrentUser,
+  getUserById,
   getBetsForUser,
   getMarketById,
   getStartupBySlug,
   getStartupsByFounder,
-  getPnlHistory,
+  getLeaderboard,
+  getGoogleAvatarUrl,
   formatCents,
   timeAgo,
 } from "@/lib/data";
-import { leaderboard } from "@/lib/mock";
 import { Credits } from "@/components/ui/credits";
 import { XIcon } from "@/components/ui/x-icon";
-import { PnlChart } from "@/components/profile/pnl-chart";
+import { EditableAvatar, EditableName, EditableXHandle } from "@/components/profile/profile-settings";
 import { Trophy, Target, Calendar, Layers } from "lucide-react";
 
 interface PageProps {
-  params: Promise<{ xHandle: string }>;
+  params: Promise<{ id: string }>;
 }
 
 export default async function ProfilePage({ params }: PageProps) {
-  const { xHandle } = await params;
-  const user = getUserByXHandle(xHandle);
+  const { id } = await params;
+  const [user, currentUser, googleAvatarUrl] = await Promise.all([
+    getUserById(id),
+    getCurrentUser(),
+    getGoogleAvatarUrl(),
+  ]);
   if (!user) notFound();
 
-  const userBets = getBetsForUser(user.id);
+  const isOwnProfile = currentUser?.id === user.id;
+
+  const [userBets, leaderboard, founderStartups] = await Promise.all([
+    getBetsForUser(user.id),
+    getLeaderboard(),
+    user.xHandle ? getStartupsByFounder(user.xHandle) : Promise.resolve([]),
+  ]);
+
   const lbEntry = leaderboard.find((e) => e.userId === user.id);
-  const activeBets = userBets.filter((b) => getMarketById(b.marketId)?.status === "open");
-  const resolvedBets = userBets.filter((b) => getMarketById(b.marketId)?.status === "resolved");
-  const founderStartups = getStartupsByFounder(xHandle);
+
+  const marketCache = new Map<string, Awaited<ReturnType<typeof getMarketById>>>();
+  const startupCache = new Map<string, Awaited<ReturnType<typeof getStartupBySlug>>>();
+
+  for (const b of userBets) {
+    if (!marketCache.has(b.marketId)) {
+      marketCache.set(b.marketId, await getMarketById(b.marketId));
+    }
+    const market = marketCache.get(b.marketId);
+    if (market && !startupCache.has(market.startupSlug)) {
+      startupCache.set(market.startupSlug, await getStartupBySlug(market.startupSlug));
+    }
+  }
+
+  const activeBets = userBets.filter((b) => marketCache.get(b.marketId)?.status === "open");
+  const resolvedBets = userBets.filter((b) => marketCache.get(b.marketId)?.status === "resolved");
   const isFounder = founderStartups.length > 0;
-  const pnlData = getPnlHistory(user.id);
 
   const profit = lbEntry ? lbEntry.creditsWon - lbEntry.creditsLost : 0;
 
@@ -40,28 +64,43 @@ export default async function ProfilePage({ params }: PageProps) {
       {/* Header card */}
       <div className="card bg-base-100 border border-base-300">
         <div className="card-body gap-0 p-6">
-          {/* Top row: avatar + name + link */}
           <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-lg font-bold text-primary">
-              {user.xName.slice(0, 2).toUpperCase()}
-            </div>
+            {isOwnProfile ? (
+              <EditableAvatar user={user} googleAvatarUrl={googleAvatarUrl} />
+            ) : user.avatarUrl ? (
+              <img src={user.avatarUrl} alt={user.xName} className="h-14 w-14 rounded-2xl object-cover" />
+            ) : (
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-lg font-bold text-primary">
+                {user.xName.slice(0, 2).toUpperCase()}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold truncate">{user.xName}</h1>
+                {isOwnProfile ? (
+                  <EditableName user={user} />
+                ) : (
+                  <h1 className="text-xl font-bold truncate">{user.xName}</h1>
+                )}
                 {isFounder && (
                   <span className="badge badge-primary badge-sm badge-outline">Founder</span>
                 )}
               </div>
               <div className="mt-0.5 flex items-center gap-3">
-                <a
-                  href={`https://x.com/${user.xHandle}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-                >
-                  <XIcon size={14} />
-                  @{user.xHandle}
-                </a>
+                {isOwnProfile ? (
+                  <EditableXHandle user={user} />
+                ) : user.xHandle ? (
+                  <a
+                    href={`https://x.com/${user.xHandle}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                  >
+                    <XIcon size={14} />
+                    @{user.xHandle}
+                  </a>
+                ) : (
+                  <span className="text-sm text-base-content/40">No X account linked</span>
+                )}
                 <span className="flex items-center gap-1 text-xs text-base-content/40">
                   <Calendar className="h-3 w-3" />
                   {new Date(user.joinedAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
@@ -70,18 +109,12 @@ export default async function ProfilePage({ params }: PageProps) {
             </div>
           </div>
 
-          {/* Profit + P&L Chart */}
+          {/* Profit */}
           <div className="mt-6">
             <div className="flex items-baseline gap-2 mb-4">
               <Credits amount={Math.abs(profit)} prefix={profit >= 0 ? "+" : "-"} size="lg" className={`text-2xl font-black ${profit >= 0 ? "text-yes" : "text-no"}`} />
               <span className="text-sm text-base-content/50">profit</span>
             </div>
-
-            {pnlData.length > 1 && (
-              <div className="rounded-xl bg-base-200/50 p-3">
-                <PnlChart data={pnlData} />
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -172,8 +205,8 @@ export default async function ProfilePage({ params }: PageProps) {
         {activeBets.length > 0 ? (
           <div className="space-y-2">
             {activeBets.map((bet) => {
-              const market = getMarketById(bet.marketId);
-              const startup = market ? getStartupBySlug(market.startupSlug) : null;
+              const market = marketCache.get(bet.marketId);
+              const startup = market ? startupCache.get(market.startupSlug) : null;
               if (!market || !startup) return null;
               return (
                 <Link
@@ -182,7 +215,6 @@ export default async function ProfilePage({ params }: PageProps) {
                   className="flex items-center justify-between rounded-xl border border-base-300 bg-base-100 p-4 transition-colors hover:bg-base-300/30"
                 >
                   <div className="flex items-center gap-3">
-                    {/* Startup logo */}
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-[10px] font-bold text-primary">
                       {startup.name.slice(0, 2).toUpperCase()}
                     </div>
@@ -217,8 +249,8 @@ export default async function ProfilePage({ params }: PageProps) {
         {resolvedBets.length > 0 ? (
           <div className="space-y-2">
             {resolvedBets.map((bet) => {
-              const market = getMarketById(bet.marketId);
-              const startup = market ? getStartupBySlug(market.startupSlug) : null;
+              const market = marketCache.get(bet.marketId);
+              const startup = market ? startupCache.get(market.startupSlug) : null;
               if (!market || !startup) return null;
               const won = market.resolvedOutcome === bet.side;
               return (
@@ -228,7 +260,6 @@ export default async function ProfilePage({ params }: PageProps) {
                   className="flex items-center justify-between rounded-xl border border-base-300 bg-base-100 p-4 transition-colors hover:bg-base-300/30"
                 >
                   <div className="flex items-center gap-3">
-                    {/* Startup logo */}
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-[10px] font-bold text-primary">
                       {startup.name.slice(0, 2).toUpperCase()}
                     </div>

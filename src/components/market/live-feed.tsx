@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { getFeedItems, timeAgo } from "@/lib/data";
+import { timeAgo } from "@/lib/helpers";
 import { Credits } from "@/components/ui/credits";
+import type { FeedItem } from "@/lib/types";
 
-export function LiveFeed() {
-  const items = getFeedItems();
+interface LiveFeedProps {
+  items: FeedItem[];
+}
 
+export function LiveFeed({ items }: LiveFeedProps) {
   return (
     <div className="card bg-base-100 border border-base-300 overflow-hidden">
       <div className="flex items-center gap-2 border-b border-base-300 px-5 py-3">

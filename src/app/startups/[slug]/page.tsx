@@ -7,6 +7,8 @@ import {
   getStartupBySlug,
   getMarketsForStartup,
   getStartupSentiment,
+  getStartupsByFounder,
+  getMrrHistory,
   formatCents,
 } from "@/lib/data";
 import { ExternalLink, TrendingUp, TrendingDown, Users, Calendar } from "lucide-react";
@@ -17,15 +19,31 @@ interface PageProps {
 
 export default async function StartupPage({ params }: PageProps) {
   const { slug } = await params;
-  const startup = getStartupBySlug(slug);
+  const startup = await getStartupBySlug(slug);
   if (!startup) notFound();
 
-  const allMarkets = getMarketsForStartup(slug);
+  const [allMarkets, mrrData] = await Promise.all([
+    getMarketsForStartup(slug),
+    getMrrHistory(slug),
+  ]);
+
   const openMarkets = allMarkets.filter((m) => m.status === "open");
   const resolvedMarkets = allMarkets.filter((m) => m.status === "resolved");
-  const sentiment = getStartupSentiment(slug);
+  const sentiment = getStartupSentiment(allMarkets);
   const growthPositive = (startup.growth30d ?? 0) >= 0;
   const resolvedCorrectly = resolvedMarkets.filter((m) => m.resolvedOutcome === "yes").length;
+
+  const founderData = await Promise.all(
+    startup.cofounders.map(async (founder) => {
+      const allStartups = await getStartupsByFounder(founder.xHandle);
+      const founderMarkets: Awaited<ReturnType<typeof getMarketsForStartup>> = [];
+      for (const s of allStartups) {
+        const m = await getMarketsForStartup(s.slug);
+        founderMarkets.push(...m);
+      }
+      return { founder, allStartups, allMarkets: founderMarkets };
+    })
+  );
 
   return (
     <div className="space-y-6 animate-fade-up">
@@ -121,16 +139,17 @@ export default async function StartupPage({ params }: PageProps) {
         <div className="card bg-base-100 border border-base-300 lg:col-span-2">
           <div className="card-body p-5">
             <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-base-content/50">MRR History</h3>
-            <MrrChart slug={startup.slug} height={240} />
+            <MrrChart slug={startup.slug} data={mrrData} height={240} />
           </div>
         </div>
 
-        {startup.cofounders.map((founder) => (
+        {founderData.map((fd) => (
           <FounderCard
-            key={founder.xHandle}
-            founder={founder}
+            key={fd.founder.xHandle}
+            founder={fd.founder}
             xFollowerCount={startup.xFollowerCount}
-            currentStartupSlug={startup.slug}
+            allStartups={fd.allStartups}
+            allMarkets={fd.allMarkets}
           />
         ))}
       </div>
@@ -139,7 +158,7 @@ export default async function StartupPage({ params }: PageProps) {
         <div className="space-y-4">
           <h2 className="text-lg font-bold">Active Markets</h2>
           <div className="stagger-children grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {openMarkets.map((m) => <MarketCard key={m.id} market={m} />)}
+            {openMarkets.map((m) => <MarketCard key={m.id} market={m} startup={startup} />)}
           </div>
         </div>
       )}
@@ -153,7 +172,7 @@ export default async function StartupPage({ params }: PageProps) {
             </span>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {resolvedMarkets.map((m) => <MarketCard key={m.id} market={m} />)}
+            {resolvedMarkets.map((m) => <MarketCard key={m.id} market={m} startup={startup} />)}
           </div>
         </div>
       )}

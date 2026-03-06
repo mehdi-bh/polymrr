@@ -1,23 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { getCurrentUser } from "@/lib/data";
 import { Credits } from "@/components/ui/credits";
+import type { User } from "@/lib/types";
 
 interface BetFormProps {
   marketId: string;
   yesOdds: number;
+  user: User | null;
 }
 
-export function BetForm({ marketId, yesOdds }: BetFormProps) {
+export function BetForm({ marketId, yesOdds, user }: BetFormProps) {
   const [side, setSide] = useState<"yes" | "no">("yes");
   const [amount, setAmount] = useState("");
-  const user = getCurrentUser();
 
   void marketId;
 
   const handleBet = () => {
-    if (!user) { alert("Sign in with X to place a bet"); return; }
+    if (!user) { alert("Sign in with Google to place a bet"); return; }
     const credits = parseInt(amount);
     if (!credits || credits < 50) { alert("Minimum bet is 50 credits"); return; }
     alert(`Mock: Placed ${credits}cr ${side.toUpperCase()} bet`);

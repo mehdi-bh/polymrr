@@ -1,108 +1,173 @@
 // ---------------------------------------------------------------------------
-// Data access layer — thin wrapper over mock data.
-// When switching to a real backend, replace the bodies of these functions
-// with API calls or DB queries. The signatures stay the same.
+// Data access layer — async queries against Supabase.
 // ---------------------------------------------------------------------------
 
-import { startups, mrrHistories, markets, users, bets, leaderboard, feedItems, currentUser, pnlHistories } from "./mock";
-import type { Startup, Market, Bet, User, LeaderboardEntry, FeedItem, MrrSnapshot, PnlSnapshot, MarketType, MarketStatus, TrustMRRCategory } from "./types";
+import { createClient } from "@/lib/supabase/server";
+import {
+  mapStartup,
+  mapMarket,
+  mapBet,
+  mapUser,
+  mapLeaderboardEntry,
+  mapFeedItem,
+  mapMrrSnapshot,
+} from "./mappers";
+import type {
+  Startup,
+  Market,
+  Bet,
+  User,
+  LeaderboardEntry,
+  FeedItem,
+  MrrSnapshot,
+} from "./types";
 
 // -- Auth -------------------------------------------------------------------
 
-export function getCurrentUser(): User | null {
-  return currentUser;
+export async function getCurrentUser(): Promise<User | null> {
+  const supabase = await createClient();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+  if (!authUser) return null;
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", authUser.id)
+    .single();
+  if (!data) return null;
+  return mapUser(data);
 }
 
 // -- Startups ---------------------------------------------------------------
 
-export function getStartups(): Startup[] {
-  return startups;
+async function fetchStartupRelations(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  slugs: string[]
+) {
+  if (slugs.length === 0) return { techMap: new Map(), cofounderMap: new Map() };
+
+  const [{ data: tech }, { data: cofounders }] = await Promise.all([
+    supabase.from("startup_tech_stack").select("*").in("startup_slug", slugs),
+    supabase.from("startup_cofounders").select("*").in("startup_slug", slugs),
+  ]);
+
+  const techMap = new Map<string, typeof tech>();
+  for (const t of tech ?? []) {
+    const arr = techMap.get(t.startup_slug) ?? [];
+    arr.push(t);
+    techMap.set(t.startup_slug, arr);
+  }
+
+  const cofounderMap = new Map<string, typeof cofounders>();
+  for (const c of cofounders ?? []) {
+    const arr = cofounderMap.get(c.startup_slug) ?? [];
+    arr.push(c);
+    cofounderMap.set(c.startup_slug, arr);
+  }
+
+  return { techMap, cofounderMap };
 }
 
-export function getStartupBySlug(slug: string): Startup | undefined {
-  return startups.find((s) => s.slug === slug);
+export async function getStartups(): Promise<Startup[]> {
+  const supabase = await createClient();
+  const { data: rows } = await supabase.from("startups").select("*");
+  if (!rows || rows.length === 0) return [];
+
+  const slugs = rows.map((r) => r.slug);
+  const { techMap, cofounderMap } = await fetchStartupRelations(supabase, slugs);
+
+  return rows.map((r) =>
+    mapStartup(r, techMap.get(r.slug) ?? [], cofounderMap.get(r.slug) ?? [])
+  );
 }
 
-export function getStartupsByFounder(xHandle: string): Startup[] {
-  return startups.filter((s) => s.cofounders.some((c) => c.xHandle === xHandle));
+export async function getStartupBySlug(slug: string): Promise<Startup | undefined> {
+  const supabase = await createClient();
+  const { data: row } = await supabase
+    .from("startups")
+    .select("*")
+    .eq("slug", slug)
+    .single();
+  if (!row) return undefined;
+
+  const { techMap, cofounderMap } = await fetchStartupRelations(supabase, [slug]);
+  return mapStartup(row, techMap.get(slug) ?? [], cofounderMap.get(slug) ?? []);
 }
 
-export function getMrrHistory(slug: string): MrrSnapshot[] {
-  return mrrHistories[slug] ?? [];
+export async function getStartupsByFounder(xHandle: string): Promise<Startup[]> {
+  const supabase = await createClient();
+  const { data: cofRows } = await supabase
+    .from("startup_cofounders")
+    .select("startup_slug")
+    .eq("x_handle", xHandle);
+  if (!cofRows || cofRows.length === 0) return [];
+
+  const slugs = cofRows.map((r) => r.startup_slug);
+  const { data: rows } = await supabase.from("startups").select("*").in("slug", slugs);
+  if (!rows || rows.length === 0) return [];
+
+  const { techMap, cofounderMap } = await fetchStartupRelations(supabase, slugs);
+  return rows.map((r) =>
+    mapStartup(r, techMap.get(r.slug) ?? [], cofounderMap.get(r.slug) ?? [])
+  );
+}
+
+export async function getMrrHistory(slug: string): Promise<MrrSnapshot[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("mrr_history")
+    .select("date, mrr")
+    .eq("startup_slug", slug)
+    .order("date");
+  return (data ?? []).map(mapMrrSnapshot);
 }
 
 // -- Markets ----------------------------------------------------------------
 
-export function getMarkets(): Market[] {
-  return markets;
+export async function getMarkets(): Promise<Market[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("markets").select("*").order("closes_at");
+  return (data ?? []).map(mapMarket);
 }
 
-export function getMarketById(id: string): Market | undefined {
-  return markets.find((m) => m.id === id);
+export async function getMarketById(id: string): Promise<Market | undefined> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("markets").select("*").eq("id", id).single();
+  return data ? mapMarket(data) : undefined;
 }
 
-export function getMarketsForStartup(slug: string): Market[] {
-  return markets.filter((m) => m.startupSlug === slug);
+export async function getMarketsForStartup(slug: string): Promise<Market[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("markets")
+    .select("*")
+    .eq("startup_slug", slug)
+    .order("closes_at");
+  return (data ?? []).map(mapMarket);
 }
 
-export function getOpenMarkets(): Market[] {
-  return markets.filter((m) => m.status === "open");
+export async function getOpenMarkets(): Promise<Market[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("markets")
+    .select("*")
+    .eq("status", "open")
+    .order("closes_at");
+  return (data ?? []).map(mapMarket);
 }
 
-export function getFilteredMarkets(filters: {
-  status?: MarketStatus | "closing-soon";
-  type?: MarketType;
-  category?: TrustMRRCategory;
-  sort?: "popular" | "closing-soon" | "newest" | "biggest-pot";
-}): Market[] {
-  let result = [...markets];
+export async function getFeaturedMarkets(): Promise<Market[]> {
+  const open = await getOpenMarkets();
 
-  if (filters.status === "closing-soon") {
-    const tenDays = 10 * 24 * 60 * 60 * 1000;
-    result = result.filter(
-      (m) => m.status === "open" && new Date(m.closesAt).getTime() - Date.now() < tenDays
-    );
-  } else if (filters.status) {
-    result = result.filter((m) => m.status === filters.status);
-  }
-
-  if (filters.type) {
-    result = result.filter((m) => m.type === filters.type);
-  }
-
-  if (filters.category) {
-    result = result.filter((m) => {
-      const startup = getStartupBySlug(m.startupSlug);
-      return startup?.category === filters.category;
-    });
-  }
-
-  switch (filters.sort) {
-    case "popular":
-      result.sort((a, b) => b.totalBettors - a.totalBettors);
-      break;
-    case "closing-soon":
-      result.sort((a, b) => new Date(a.closesAt).getTime() - new Date(b.closesAt).getTime());
-      break;
-    case "newest":
-      result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      break;
-    case "biggest-pot":
-      result.sort((a, b) => b.totalCredits - a.totalCredits);
-      break;
-    default:
-      result.sort((a, b) => new Date(a.closesAt).getTime() - new Date(b.closesAt).getTime());
-  }
-
-  return result;
-}
-
-/** Featured markets for the landing page: 2 popular, 2 closing soon, 2 acquisition */
-export function getFeaturedMarkets(): Market[] {
-  const open = getOpenMarkets();
   const byPopularity = [...open].sort((a, b) => b.totalBettors - a.totalBettors);
-  const byClosing = [...open].sort((a, b) => new Date(a.closesAt).getTime() - new Date(b.closesAt).getTime());
-  const acquisitions = open.filter((m) => m.type === "acquisition").sort((a, b) => b.totalBettors - a.totalBettors);
+  const byClosing = [...open].sort(
+    (a, b) => new Date(a.closesAt).getTime() - new Date(b.closesAt).getTime()
+  );
+  const acquisitions = open
+    .filter((m) => m.type === "acquisition")
+    .sort((a, b) => b.totalBettors - a.totalBettors);
 
   const picked = new Set<string>();
   const result: Market[] = [];
@@ -112,108 +177,118 @@ export function getFeaturedMarkets(): Market[] {
       if (picked.has(m.id)) continue;
       picked.add(m.id);
       result.push(m);
-      if (result.length - (result.length - count) >= count) return;
-      if (picked.size >= result.length) return;
+      if (result.length >= picked.size && picked.size >= count + (result.length - count))
+        return;
     }
   }
 
-  const startLen = result.length;
   pick(byPopularity, 2);
   pick(byClosing, 2);
   pick(acquisitions, 2);
-
-  // Fill remaining slots if needed
   if (result.length < 6) pick(open, 6 - result.length);
 
-  void startLen;
   return result.slice(0, 6);
 }
 
 // -- Bets -------------------------------------------------------------------
 
-export function getBetsForMarket(marketId: string): Bet[] {
-  return bets.filter((b) => b.marketId === marketId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+export async function getBetsForMarket(marketId: string): Promise<Bet[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("bets")
+    .select("*")
+    .eq("market_id", marketId)
+    .order("created_at", { ascending: false });
+  return (data ?? []).map(mapBet);
 }
 
-export function getBetsForUser(userId: string): Bet[] {
-  return bets.filter((b) => b.userId === userId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+export async function getBetsForUser(userId: string): Promise<Bet[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("bets")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  return (data ?? []).map(mapBet);
 }
 
 // -- Users ------------------------------------------------------------------
 
-export function getUserByXHandle(xHandle: string): User | undefined {
-  return users.find((u) => u.xHandle === xHandle);
+export async function getUserByXHandle(xHandle: string): Promise<User | undefined> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("x_handle", xHandle)
+    .single();
+  return data ? mapUser(data) : undefined;
 }
 
-export function getUserById(id: string): User | undefined {
-  return users.find((u) => u.id === id);
+export async function getUserById(id: string): Promise<User | undefined> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", id)
+    .single();
+  return data ? mapUser(data) : undefined;
 }
 
 // -- Leaderboard ------------------------------------------------------------
 
-export function getLeaderboard(): LeaderboardEntry[] {
-  return leaderboard;
+export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("leaderboard").select("*");
+  return (data ?? []).map(mapLeaderboardEntry);
 }
 
 // -- Feed -------------------------------------------------------------------
 
-export function getFeedItems(): FeedItem[] {
-  return feedItems;
-}
-
-// -- P&L History ------------------------------------------------------------
-
-export function getPnlHistory(userId: string): PnlSnapshot[] {
-  return pnlHistories[userId] ?? [];
+export async function getFeedItems(): Promise<FeedItem[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("feed_items").select("*");
+  return (data ?? []).map(mapFeedItem);
 }
 
 // -- Stats ------------------------------------------------------------------
 
-export function getGlobalStats() {
+export async function getGlobalStats() {
+  const supabase = await createClient();
+
+  const [
+    { count: openMarkets },
+    { count: startupsTracked },
+    { count: betsPlaced },
+    { data: revRow },
+  ] = await Promise.all([
+    supabase.from("markets").select("*", { count: "exact", head: true }).eq("status", "open"),
+    supabase.from("startups").select("*", { count: "exact", head: true }),
+    supabase.from("bets").select("*", { count: "exact", head: true }),
+    supabase.rpc("sum_startup_revenue").single<{ total: number }>(),
+  ]);
+
   return {
-    openMarkets: getOpenMarkets().length,
-    startupsTracked: startups.length,
-    betsPlaced: bets.length,
-    totalVerifiedRevenue: startups.reduce((sum, s) => sum + s.revenue.total, 0),
+    openMarkets: openMarkets ?? 0,
+    startupsTracked: startupsTracked ?? 0,
+    betsPlaced: betsPlaced ?? 0,
+    totalVerifiedRevenue: revRow?.total ?? 0,
   };
 }
 
-// -- Helpers ----------------------------------------------------------------
-
-/** Format USD cents to human-readable string */
-export function formatCents(cents: number): string {
-  const dollars = cents / 100;
-  if (dollars >= 1_000_000) return `$${(dollars / 1_000_000).toFixed(1)}M`;
-  if (dollars >= 1_000) return `$${(dollars / 1_000).toFixed(dollars >= 10_000 ? 0 : 1)}k`;
-  return `$${dollars.toFixed(0)}`;
+export async function getGoogleAvatarUrl(): Promise<string | null> {
+  const supabase = await createClient();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+  if (!authUser) return null;
+  return (authUser.user_metadata?.avatar_url as string) ?? null;
 }
 
-/** Format credits with commas */
-export function formatCredits(n: number): string {
-  return n.toLocaleString() + "cr";
-}
-
-/** Compute sentiment across open markets for a startup (0-100, bullish %) */
-export function getStartupSentiment(slug: string): number {
-  const openMarkets = getMarketsForStartup(slug).filter((m) => m.status === "open");
-  if (openMarkets.length === 0) return 50;
-  const avg = openMarkets.reduce((sum, m) => sum + m.yesOdds, 0) / openMarkets.length;
-  return Math.round(avg);
-}
-
-/** Days remaining until a date */
-export function daysUntil(dateStr: string): number {
-  return Math.max(0, Math.ceil((new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-}
-
-/** Time ago string */
-export function timeAgo(dateStr: string): string {
-  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
+// -- Helpers (pure, synchronous) — re-exported from helpers.ts for convenience
+export {
+  formatCents,
+  formatCredits,
+  getStartupSentiment,
+  daysUntil,
+  timeAgo,
+} from "./helpers";
