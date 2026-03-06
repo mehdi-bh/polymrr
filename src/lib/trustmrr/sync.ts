@@ -143,6 +143,28 @@ export async function storeSnapshot(admin: Admin, data: TrustMRRDetail) {
   );
 }
 
+/** Bulk-upsert scraped MRR history points */
+export async function storeMrrHistory(
+  admin: Admin,
+  slug: string,
+  points: { date: string; mrr: number }[]
+) {
+  if (points.length === 0) return;
+
+  const rows = points.map((p) => ({
+    startup_slug: slug,
+    date: p.date,
+    mrr: p.mrr,
+  }));
+
+  for (let i = 0; i < rows.length; i += 100) {
+    const { error } = await admin
+      .from("mrr_history")
+      .upsert(rows.slice(i, i + 100), { onConflict: "startup_slug,date" });
+    if (error) console.error(`mrr_history upsert for ${slug}:`, error.message);
+  }
+}
+
 /** Log a sync run to sync_log */
 export async function logSync(
   admin: Admin,

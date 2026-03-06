@@ -83,7 +83,7 @@ export default async function StartupPage({ params }: PageProps) {
                 </a>
               )}
               <a
-                href={`https://trustmrr.com/startups/${startup.slug}`}
+                href={`https://trustmrr.com/startup/${startup.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-sm text-base-content/50 transition-colors hover:text-base-content"

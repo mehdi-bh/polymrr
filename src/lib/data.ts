@@ -116,12 +116,28 @@ export async function getStartupsByFounder(xHandle: string): Promise<Startup[]> 
 
 export async function getMrrHistory(slug: string): Promise<MrrSnapshot[]> {
   const supabase = await createClient();
-  const { data } = await supabase
+
+  const { data: scraped } = await supabase
     .from("mrr_history")
     .select("date, mrr")
     .eq("startup_slug", slug)
     .order("date");
-  return (data ?? []).map(mapMrrSnapshot);
+
+  if (scraped && scraped.length > 5) {
+    return scraped.map(mapMrrSnapshot);
+  }
+
+  // Fallback: use daily snapshots when scraped data is sparse
+  const { data: snapshots } = await supabase
+    .from("startup_snapshots")
+    .select("snapshot_date, mrr")
+    .eq("startup_slug", slug)
+    .order("snapshot_date");
+
+  return (snapshots ?? []).map((s: { snapshot_date: string; mrr: number }) => ({
+    date: s.snapshot_date,
+    mrr: s.mrr,
+  }));
 }
 
 // -- Markets ----------------------------------------------------------------

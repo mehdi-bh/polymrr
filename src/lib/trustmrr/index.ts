@@ -19,6 +19,7 @@ export {
 export {
   upsertStartup,
   storeSnapshot,
+  storeMrrHistory,
   logSync,
   updateSyncLog,
 } from "./sync";
