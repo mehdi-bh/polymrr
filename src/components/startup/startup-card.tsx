@@ -20,9 +20,13 @@ export function StartupCard({ startup, activeMarketCount, sentiment }: StartupCa
       <div className="card-body gap-3 p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
-              {startup.name.slice(0, 2).toUpperCase()}
-            </div>
+            {startup.icon ? (
+              <img src={startup.icon} alt={startup.name} className="h-9 w-9 rounded-lg object-cover" />
+            ) : (
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                {startup.name.slice(0, 2).toUpperCase()}
+              </div>
+            )}
             <span className="text-sm font-semibold">{startup.name}</span>
           </div>
           {startup.onSale && (

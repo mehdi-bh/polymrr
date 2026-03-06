@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/resolve-markets",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/sync-startups",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/sync-frequent",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

@@ -59,24 +59,38 @@ export default async function StartupPage({ params }: PageProps) {
 
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-lg font-bold text-primary">
-                {startup.name.slice(0, 2).toUpperCase()}
-              </div>
+              {startup.icon ? (
+                <img src={startup.icon} alt={startup.name} className="h-14 w-14 rounded-xl object-cover" />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-lg font-bold text-primary">
+                  {startup.name.slice(0, 2).toUpperCase()}
+                </div>
+              )}
               <div>
                 <h1 className="text-2xl font-bold">{startup.name}</h1>
                 <p className="mt-0.5 text-sm text-base-content/50">{startup.description}</p>
               </div>
             </div>
-            {startup.website && (
+            <div className="flex items-center gap-3">
+              {startup.website && (
+                <a
+                  href={startup.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:brightness-125"
+                >
+                  Website <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              )}
               <a
-                href={startup.website}
+                href={`https://trustmrr.com/startups/${startup.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:brightness-125"
+                className="flex items-center gap-1.5 text-sm text-base-content/50 transition-colors hover:text-base-content"
               >
-                Website <ExternalLink className="h-3.5 w-3.5" />
+                TrustMRR <ExternalLink className="h-3.5 w-3.5" />
               </a>
-            )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
