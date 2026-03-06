@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getCurrentUser } from "@/lib/data";
-import { Credits } from "@/components/ui/credits";
 import { XIcon } from "@/components/ui/x-icon";
+import { QuestPopup } from "@/components/ui/quest-popup";
 import { TrendingUp, BarChart3, Trophy, LayoutDashboard, User } from "lucide-react";
 
 const navLinks = [
@@ -50,9 +50,7 @@ export function Navbar() {
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              <div className="badge badge-neutral py-3 px-3">
-                <Credits amount={user.credits} size="md" className="font-semibold text-primary" />
-              </div>
+              <QuestPopup credits={user.credits} />
               <Link
                 href="/dashboard"
                 className={`btn btn-ghost btn-sm gap-1.5 text-[13px] ${

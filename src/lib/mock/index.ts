@@ -7,4 +7,4 @@
 
 export { startups, mrrHistories } from "./startups";
 export { markets } from "./markets";
-export { users, currentUser, bets, leaderboard, feedItems } from "./users";
+export { users, currentUser, bets, leaderboard, feedItems, pnlHistories } from "./users";

@@ -1,4 +1,4 @@
-import { User, Bet, LeaderboardEntry, FeedItem } from "@/lib/types";
+import { User, Bet, LeaderboardEntry, FeedItem, PnlSnapshot } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Mock users
@@ -61,6 +61,35 @@ export const leaderboard: LeaderboardEntry[] = [
 // Mock live feed — pre-built from bets + markets + startups for the landing page.
 // In production, this is a real-time stream.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Mock P&L history — net worth over time per user.
+// ---------------------------------------------------------------------------
+
+function generatePnlHistory(userId: string): PnlSnapshot[] {
+  const user = users.find((u) => u.id === userId);
+  if (!user) return [];
+  const currentNetWorth = user.credits;
+  const snapshots: PnlSnapshot[] = [];
+  const now = new Date();
+  const days = 30;
+  const startValue = currentNetWorth * 0.65;
+  for (let i = days; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    const progress = (days - i) / days;
+    const noise = Math.sin(i * 0.8) * currentNetWorth * 0.05 + Math.cos(i * 1.3) * currentNetWorth * 0.03;
+    const value = Math.round(startValue + (currentNetWorth - startValue) * progress + noise);
+    snapshots.push({ date: date.toISOString().split("T")[0], value });
+  }
+  // Ensure last point is exactly current
+  snapshots[snapshots.length - 1].value = currentNetWorth;
+  return snapshots;
+}
+
+export const pnlHistories: Record<string, PnlSnapshot[]> = Object.fromEntries(
+  users.map((u) => [u.id, generatePnlHistory(u.id)])
+);
 
 export const feedItems: FeedItem[] = [
   { id: "f1", userXHandle: "sarahbuilds", side: "yes", startupName: "ShipFast", marketQuestion: "hits $20k MRR", amount: 200, createdAt: "2026-03-06T10:58:00.000Z" },

@@ -146,6 +146,12 @@ export interface MrrSnapshot {
   mrr: number; // USD cents
 }
 
+/** A single point in the P&L / net worth history chart */
+export interface PnlSnapshot {
+  date: string;
+  value: number; // credits
+}
+
 /** Live feed item displayed on landing page */
 export interface FeedItem {
   id: string;

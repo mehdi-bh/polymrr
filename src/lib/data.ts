@@ -4,8 +4,8 @@
 // with API calls or DB queries. The signatures stay the same.
 // ---------------------------------------------------------------------------
 
-import { startups, mrrHistories, markets, users, bets, leaderboard, feedItems, currentUser } from "./mock";
-import type { Startup, Market, Bet, User, LeaderboardEntry, FeedItem, MrrSnapshot, MarketType, MarketStatus, TrustMRRCategory } from "./types";
+import { startups, mrrHistories, markets, users, bets, leaderboard, feedItems, currentUser, pnlHistories } from "./mock";
+import type { Startup, Market, Bet, User, LeaderboardEntry, FeedItem, MrrSnapshot, PnlSnapshot, MarketType, MarketStatus, TrustMRRCategory } from "./types";
 
 // -- Auth -------------------------------------------------------------------
 
@@ -159,6 +159,12 @@ export function getLeaderboard(): LeaderboardEntry[] {
 
 export function getFeedItems(): FeedItem[] {
   return feedItems;
+}
+
+// -- P&L History ------------------------------------------------------------
+
+export function getPnlHistory(userId: string): PnlSnapshot[] {
+  return pnlHistories[userId] ?? [];
 }
 
 // -- Stats ------------------------------------------------------------------
