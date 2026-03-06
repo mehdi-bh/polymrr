@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { MarketCard } from "@/components/market/market-card";
 import { MrrChart } from "@/components/startup/mrr-chart";
+import { FounderCard } from "@/components/startup/founder-card";
 import {
   getStartupBySlug,
   getMarketsForStartup,
@@ -124,29 +125,14 @@ export default async function StartupPage({ params }: PageProps) {
           </div>
         </div>
 
-        <div className="card bg-base-100 border border-base-300">
-          <div className="card-body p-5">
-            <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-base-content/50">Founder</h3>
-            {startup.cofounders.map((founder) => (
-              <div key={founder.xHandle} className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                  {(founder.xName ?? founder.xHandle).slice(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <div className="font-semibold">{founder.xName ?? founder.xHandle}</div>
-                  <Link href={`/profile/${founder.xHandle}`} className="text-sm text-primary hover:underline">
-                    @{founder.xHandle}
-                  </Link>
-                  {startup.xFollowerCount && (
-                    <div className="mono-num text-xs text-base-content/50">
-                      {startup.xFollowerCount.toLocaleString()} followers
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        {startup.cofounders.map((founder) => (
+          <FounderCard
+            key={founder.xHandle}
+            founder={founder}
+            xFollowerCount={startup.xFollowerCount}
+            currentStartupSlug={startup.slug}
+          />
+        ))}
       </div>
 
       {openMarkets.length > 0 && (

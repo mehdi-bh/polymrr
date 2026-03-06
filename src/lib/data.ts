@@ -23,6 +23,10 @@ export function getStartupBySlug(slug: string): Startup | undefined {
   return startups.find((s) => s.slug === slug);
 }
 
+export function getStartupsByFounder(xHandle: string): Startup[] {
+  return startups.filter((s) => s.cofounders.some((c) => c.xHandle === xHandle));
+}
+
 export function getMrrHistory(slug: string): MrrSnapshot[] {
   return mrrHistories[slug] ?? [];
 }

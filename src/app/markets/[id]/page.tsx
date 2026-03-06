@@ -13,6 +13,7 @@ import {
   timeAgo,
 } from "@/lib/data";
 import { Credits } from "@/components/ui/credits";
+import { ShareMarketButton } from "@/components/market/share-market-button";
 import { Clock, Users, ExternalLink } from "lucide-react";
 
 interface PageProps {
@@ -64,20 +65,28 @@ export default async function MarketPage({ params }: PageProps) {
 
           <OddsBar yesOdds={market.yesOdds} size="lg" />
 
-          <div className="flex items-center gap-6 text-sm text-base-content/50">
-            <span className="inline-flex items-center gap-1"><Credits amount={market.totalCredits} /> pool</span>
-            <span className="flex items-center gap-1.5">
-              <Users className="h-4 w-4" />
-              <span className="mono-num">{market.totalBettors}</span> bettors
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Clock className="h-4 w-4" />
-              {market.status === "open" ? (
-                <span>Closes in <span className="mono-num font-semibold text-base-content">{days}</span> days</span>
-              ) : (
-                <span>Closed {timeAgo(market.closesAt)}</span>
-              )}
-            </span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6 text-sm text-base-content/50">
+              <span className="inline-flex items-center gap-1"><Credits amount={market.totalCredits} /> pool</span>
+              <span className="flex items-center gap-1.5">
+                <Users className="h-4 w-4" />
+                <span className="mono-num">{market.totalBettors}</span> bettors
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Clock className="h-4 w-4" />
+                {market.status === "open" ? (
+                  <span>Closes in <span className="mono-num font-semibold text-base-content">{days}</span> days</span>
+                ) : (
+                  <span>Closed {timeAgo(market.closesAt)}</span>
+                )}
+              </span>
+            </div>
+            <ShareMarketButton
+              question={market.question}
+              startupName={startup.name}
+              yesOdds={market.yesOdds}
+              marketId={market.id}
+            />
           </div>
 
           {market.status === "open" && (

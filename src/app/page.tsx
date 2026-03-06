@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { XIcon } from "@/components/ui/x-icon";
 import { LiveFeed } from "@/components/market/live-feed";
 import { StatsBar } from "@/components/market/stats-bar";
 import { MarketCard } from "@/components/market/market-card";
@@ -21,8 +22,8 @@ export default function HomePage() {
           Markets powered by TrustMRR verified data.
         </p>
         <div className="flex flex-col items-center gap-2">
-          <button className="btn btn-primary btn-lg font-bold">
-            Sign in with X
+          <button className="btn btn-primary btn-lg font-bold gap-1.5">
+            Sign in with <XIcon size={20} dark />
           </button>
           <p className="text-xs text-base-content/40">
             Start with 1,000 bananas now.

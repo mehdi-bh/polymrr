@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getCurrentUser } from "@/lib/data";
 import { Credits } from "@/components/ui/credits";
+import { XIcon } from "@/components/ui/x-icon";
 import { TrendingUp, BarChart3, Trophy, LayoutDashboard, User } from "lucide-react";
 
 const navLinks = [
@@ -72,7 +73,8 @@ export function Navbar() {
               </Link>
             </>
           ) : (
-            <button className="btn btn-primary btn-sm text-[13px]">
+            <button className="btn btn-primary btn-sm text-[13px] gap-1.5">
+              <XIcon size={14} />
               Sign in with X
             </button>
           )}

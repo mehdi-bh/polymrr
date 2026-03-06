@@ -2,6 +2,7 @@ import Link from "next/link";
 import { OddsBar } from "./odds-bar";
 import { getStartupBySlug, daysUntil, formatCents } from "@/lib/data";
 import { Credits } from "@/components/ui/credits";
+import { ShareMarketButton } from "./share-market-button";
 import type { Market } from "@/lib/types";
 import { Clock, Users } from "lucide-react";
 
@@ -56,10 +57,19 @@ export function MarketCard({ market }: MarketCardProps) {
               {market.totalBettors}
             </span>
           </div>
-          <span className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            <span className="mono-num">{days}d</span>
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              <span className="mono-num">{days}d</span>
+            </span>
+            <ShareMarketButton
+              question={market.question}
+              startupName={startup.name}
+              yesOdds={market.yesOdds}
+              marketId={market.id}
+              size="sm"
+            />
+          </div>
         </div>
       </div>
     </Link>
