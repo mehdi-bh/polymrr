@@ -61,6 +61,9 @@ export function mapMarket(row: any): Market {
     resolutionCriteria: row.resolution_criteria,
     status: row.status,
     yesOdds: row.yes_odds,
+    yesShares: row.yes_shares ?? 0,
+    noShares: row.no_shares ?? 0,
+    liquidityParam: row.liquidity_param ?? 100,
     totalCredits: row.total_credits,
     totalBettors: row.total_bettors,
     createdAt: row.created_at,
@@ -78,6 +81,7 @@ export function mapBet(row: any): Bet {
     userId: row.user_id,
     side: row.side,
     amount: row.amount,
+    shares: row.shares ?? null,
     oddsAtTime: row.odds_at_time,
     createdAt: row.created_at,
   };
@@ -114,6 +118,7 @@ export function mapLeaderboardEntry(row: any): LeaderboardEntry {
 export function mapFeedItem(row: any): FeedItem {
   return {
     id: row.id,
+    marketId: row.market_id,
     userXHandle: row.user_x_handle,
     side: row.side,
     startupName: row.startup_name,

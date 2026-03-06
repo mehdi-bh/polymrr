@@ -104,7 +104,15 @@ export default async function MarketPage({ params }: PageProps) {
           </div>
 
           {market.status === "open" && (
-            <BetForm marketId={market.id} yesOdds={market.yesOdds} user={user} />
+            <BetForm
+              marketId={market.id}
+              yesOdds={market.yesOdds}
+              yesShares={market.yesShares}
+              noShares={market.noShares}
+              liquidityParam={market.liquidityParam}
+              totalCredits={market.totalCredits}
+              user={user}
+            />
           )}
         </div>
       </div>

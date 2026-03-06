@@ -24,7 +24,7 @@ export function LiveFeed({ items }: LiveFeedProps) {
         {items.map((item) => (
           <Link
             key={item.id}
-            href="/markets"
+            href={`/markets/${item.marketId}`}
             className="flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-base-300/30"
           >
             <div className="flex items-center gap-2 overflow-hidden">

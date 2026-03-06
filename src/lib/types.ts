@@ -101,6 +101,9 @@ export interface Market {
   resolutionCriteria: string;
   status: MarketStatus;
   yesOdds: number; // 0-100
+  yesShares: number;
+  noShares: number;
+  liquidityParam: number;
   totalCredits: number;
   totalBettors: number;
   createdAt: string;
@@ -115,6 +118,7 @@ export interface Bet {
   userId: string;
   side: "yes" | "no";
   amount: number; // credits
+  shares: number | null;
   oddsAtTime: number;
   createdAt: string;
 }
@@ -155,6 +159,7 @@ export interface PnlSnapshot {
 /** Live feed item displayed on landing page */
 export interface FeedItem {
   id: string;
+  marketId: string;
   userXHandle: string;
   side: "yes" | "no";
   startupName: string;
