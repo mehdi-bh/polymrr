@@ -98,7 +98,10 @@ function authHeaders(): HeadersInit {
 async function apiFetch(url: string, attempt = 0): Promise<Response> {
   await waitForSlot();
 
-  const res = await fetch(url, { headers: authHeaders() });
+  const res = await fetch(url, {
+    headers: authHeaders(),
+    cache: "no-store",
+  });
   readRateLimitHeaders(res);
 
   // Retryable errors: 429, 508, 502, 503, 504
