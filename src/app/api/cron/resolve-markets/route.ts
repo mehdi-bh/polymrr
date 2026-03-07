@@ -1,6 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
-import { RAKE_PERCENT } from "@/lib/lmsr";
 import { resolveMarket } from "@/lib/market-templates";
 
 export const maxDuration = 300;
@@ -122,16 +121,15 @@ async function distributePayouts(admin: any, marketId: string, outcome: "yes" | 
   if (!winningBets || winningBets.length === 0) return;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const totalWinningShares = winningBets.reduce((sum: number, b: any) => sum + b.shares, 0);
+  const totalWinningAmount = winningBets.reduce((sum: number, b: any) => sum + b.amount, 0);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const bet of winningBets) {
-    const grossPayout = (bet.shares / totalWinningShares) * totalPool;
-    const netPayout = Math.floor(grossPayout * (1 - RAKE_PERCENT));
+    const payout = Math.floor((bet.amount / totalWinningAmount) * totalPool);
 
     await admin.rpc("distribute_payout", {
       p_user_id: bet.user_id,
-      p_amount: netPayout,
+      p_amount: payout,
       p_bet_id: bet.id,
       p_market_id: marketId,
     });

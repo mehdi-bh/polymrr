@@ -10,6 +10,7 @@ import {
   METRICS,
   type MarketBlueprint,
 } from "@/lib/market-templates";
+import { tryCompleteQuest } from "@/lib/quest-engine";
 
 export async function POST(request: Request) {
   // Auth check
@@ -113,5 +114,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ id: market.id, warning: "Seed bet failed: " + betError.message });
   }
 
-  return NextResponse.json({ id: market.id });
+  const completedQuests: string[] = [];
+  const created = await tryCompleteQuest(admin, user.id, "create-market");
+  if (created) completedQuests.push("create-market");
+
+  return NextResponse.json({ id: market.id, completedQuests });
 }

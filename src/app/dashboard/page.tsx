@@ -11,6 +11,7 @@ import {
 } from "@/lib/data";
 import Image from "next/image";
 import { Credits } from "@/components/ui/credits";
+import { OddsBar } from "@/components/market/odds-bar";
 import { Clock, TrendingUp } from "lucide-react";
 
 export default async function DashboardPage() {
@@ -79,28 +80,43 @@ export default async function DashboardPage() {
               const startup = market ? startupCache.get(market.startupSlug) : null;
               if (!market || !startup) return null;
 
-              const oddsNow = bet.side === "yes" ? market.yesOdds : 100 - market.yesOdds;
-              const oddsDiff = oddsNow - bet.oddsAtTime;
+              const winningSideBets = bet.side === "yes" ? market.totalYesCredits : market.totalNoCredits;
+              const estPayout = winningSideBets > 0 ? Math.floor((bet.amount / winningSideBets) * market.totalCredits) : 0;
+              const estProfit = estPayout - bet.amount;
 
               return (
                 <Link key={bet.id} href={`/markets/${market.id}`}
-                  className="flex items-center justify-between rounded-xl border border-base-300 bg-base-100 p-4 transition-colors hover:bg-base-300/30">
-                  <div className="flex items-center gap-3">
-                    <span className={`mono-num rounded-lg px-2 py-1 text-[10px] font-bold ${
-                      bet.side === "yes" ? "bg-success/10 text-yes" : "bg-error/10 text-no"
-                    }`}>{bet.side.toUpperCase()}</span>
-                    <div>
-                      <div className="text-[13px] font-semibold">{market.question}</div>
-                      <div className="text-xs text-base-content/50">
+                  className="block rounded-xl border border-base-300 bg-base-100 p-4 transition-colors hover:bg-base-300/30">
+                  {/* Row 1: Question + bet amount */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-semibold leading-tight">{market.question}</div>
+                      <div className="mt-0.5 text-xs text-base-content/50">
                         {startup.name} — <span className="mono-num">{daysUntil(market.closesAt)}d</span> left
                       </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <Credits amount={bet.amount} className="text-sm font-semibold" />
-                    <div className={`mono-num text-xs font-medium ${oddsDiff >= 0 ? "text-yes" : "text-no"}`}>
-                      {oddsDiff >= 0 ? "+" : ""}{oddsDiff}%
+                    <div className="shrink-0 text-right">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`mono-num rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                          bet.side === "yes" ? "bg-success/10 text-yes" : "bg-error/10 text-no"
+                        }`}>{bet.side.toUpperCase()}</span>
+                        <Credits amount={bet.amount} className="text-sm font-semibold" />
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Row 2: Odds bar */}
+                  <OddsBar yesOdds={market.yesOdds} size="sm" className="mt-2.5" />
+
+                  {/* Row 3: Stats */}
+                  <div className="mt-2 flex items-center justify-between text-[11px] text-base-content/50">
+                    <div className="flex items-center gap-3">
+                      <span>Est. payout: <Credits amount={estPayout} className={`font-semibold ${estProfit >= 0 ? "text-yes" : "text-no"}`} /></span>
+                      <span className={`mono-num font-semibold ${estProfit >= 0 ? "text-yes" : "text-no"}`}>
+                        {estProfit >= 0 ? "+" : ""}{estProfit.toLocaleString()} profit
+                      </span>
+                    </div>
+                    <span><Credits amount={market.totalCredits} /> pool</span>
                   </div>
                 </Link>
               );

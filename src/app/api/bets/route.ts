@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { MIN_BET } from "@/lib/lmsr";
+import { tryCompleteQuest } from "@/lib/quest-engine";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -37,5 +38,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json(data);
+  // Quest triggers (fire-and-forget, don't block the response)
+  const completedQuests: string[] = [];
+
+  const firstBet = await tryCompleteQuest(admin, user.id, "first-bet");
+  if (firstBet) completedQuests.push("first-bet");
+
+  // Underdog: bet on a side with < 30% odds
+  const oddsBeforeBet = (data as { oddsBeforeBet: number }).oddsBeforeBet;
+  const sideOdds = side === "yes" ? oddsBeforeBet : 100 - oddsBeforeBet;
+  if (sideOdds < 30) {
+    const underdog = await tryCompleteQuest(admin, user.id, "underdog-bet");
+    if (underdog) completedQuests.push("underdog-bet");
+  }
+
+  return NextResponse.json({ ...data, completedQuests });
 }

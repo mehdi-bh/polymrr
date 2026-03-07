@@ -266,6 +266,17 @@ export async function getFeedItems(): Promise<FeedItem[]> {
   return (data ?? []).map(mapFeedItem);
 }
 
+// -- Quests -----------------------------------------------------------------
+
+export async function getUserQuestCompletions(userId: string): Promise<string[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("user_quest_completions")
+    .select("quest_id")
+    .eq("user_id", userId);
+  return (data ?? []).map((r) => r.quest_id);
+}
+
 // -- Stats ------------------------------------------------------------------
 
 export async function getGlobalStats() {

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, createContext, useContext } from "react";
+import Image from "next/image";
 import { X, CheckCircle, AlertTriangle, XCircle, Info } from "lucide-react";
 
-type ToastType = "success" | "error" | "warning" | "info";
+type ToastType = "success" | "error" | "warning" | "info" | "quest";
 
 interface Toast {
   id: number;
@@ -59,6 +60,7 @@ const ICONS: Record<ToastType, React.ReactNode> = {
   error: <XCircle className="h-4 w-4 text-error shrink-0" />,
   warning: <AlertTriangle className="h-4 w-4 text-warning shrink-0" />,
   info: <Info className="h-4 w-4 text-info shrink-0" />,
+  quest: <Image src="/banana.svg" alt="" width={18} height={18} className="shrink-0" />,
 };
 
 const BAR_COLORS: Record<ToastType, string> = {
@@ -66,6 +68,7 @@ const BAR_COLORS: Record<ToastType, string> = {
   error: "bg-error",
   warning: "bg-warning",
   info: "bg-info",
+  quest: "bg-warning",
 };
 
 function ToastItem({

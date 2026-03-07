@@ -67,6 +67,8 @@ export function mapMarket(row: any): Market {
     noShares: row.no_shares ?? 0,
     liquidityParam: row.liquidity_param ?? 100,
     totalCredits: row.total_credits,
+    totalYesCredits: row.total_yes_credits ?? 0,
+    totalNoCredits: row.total_no_credits ?? 0,
     totalBettors: row.total_bettors,
     createdAt: row.created_at,
     closesAt: row.closes_at,

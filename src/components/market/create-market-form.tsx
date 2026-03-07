@@ -23,6 +23,7 @@ import {
 } from "@/lib/market-templates";
 import { formatCents } from "@/lib/helpers";
 import type { Startup, User } from "@/lib/types";
+import { QUEST_MAP } from "@/lib/quests";
 import {
   ChevronLeft,
   ChevronRight,
@@ -180,6 +181,14 @@ export function CreateMarketForm({
       } else {
         toast("success", "Market created", "Your seed bet has been placed");
       }
+
+      // Quest completion toasts
+      const completedQuests: string[] = data.completedQuests ?? [];
+      for (const qid of completedQuests) {
+        const q = QUEST_MAP.get(qid);
+        if (q) toast("quest", "Quest completed!", `${q.label} — +${q.reward.toLocaleString()} bananas`);
+      }
+
       router.push(`/markets/${data.id}`);
     } catch {
       toast("error", "Something went wrong", "Please try again");

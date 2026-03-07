@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inconsolata } from "next/font/google";
 import { Navbar } from "@/components/layout/navbar";
 import { ToastProvider } from "@/components/ui/toast";
-import { getCurrentUser } from "@/lib/data";
+import { getCurrentUser, getUserQuestCompletions } from "@/lib/data";
 import "./globals.css";
 
 const inconsolata = Inconsolata({ variable: "--font-inconsolata", subsets: ["latin"] });
@@ -18,12 +18,13 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await getCurrentUser();
+  const completedQuests = user ? await getUserQuestCompletions(user.id) : [];
 
   return (
     <html lang="en" data-theme="polymrr">
       <body className={`${inconsolata.variable} font-sans antialiased`}>
         <ToastProvider>
-          <Navbar user={user} />
+          <Navbar user={user} completedQuests={completedQuests} />
           <main className="mx-auto max-w-7xl px-4 py-8">{children}</main>
         </ToastProvider>
       </body>

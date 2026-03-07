@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { Credits } from "@/components/ui/credits";
 import { useToast } from "@/components/ui/toast";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
-import { sharesToBuy, stateAfterBet, yesOdds as calcYesOdds, estimatePayout, MIN_BET, RAKE_PERCENT } from "@/lib/lmsr";
+import { sharesToBuy, stateAfterBet, yesOdds as calcYesOdds, estimatePayout, MIN_BET } from "@/lib/lmsr";
 import type { LmsrState } from "@/lib/lmsr";
 import type { User } from "@/lib/types";
+import { QUEST_MAP } from "@/lib/quests";
 import { Info } from "lucide-react";
 
 interface BetFormProps {
@@ -17,10 +18,12 @@ interface BetFormProps {
   noShares: number;
   liquidityParam: number;
   totalCredits: number;
+  totalYesCredits: number;
+  totalNoCredits: number;
   user: User | null;
 }
 
-export function BetForm({ marketId, yesOdds, yesShares, noShares, liquidityParam, totalCredits, user }: BetFormProps) {
+export function BetForm({ marketId, yesOdds, yesShares, noShares, liquidityParam, totalCredits, totalYesCredits, totalNoCredits, user }: BetFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [side, setSide] = useState<"yes" | "no">("yes");
@@ -35,14 +38,14 @@ export function BetForm({ marketId, yesOdds, yesShares, noShares, liquidityParam
     if (credits < MIN_BET) return null;
     const shares = sharesToBuy(state, side, credits);
     const newState = stateAfterBet(state, side, shares);
-    const payout = estimatePayout(state, side, shares, totalCredits, credits);
-    const profit = Math.max(0, payout - credits);
+    const payout = estimatePayout(side, credits, totalCredits, totalYesCredits, totalNoCredits);
+    const profit = payout - credits;
     return {
       payout,
       profit,
       newOdds: calcYesOdds(newState),
     };
-  }, [credits, side, state.yesShares, state.noShares, state.b, totalCredits]);
+  }, [credits, side, state.yesShares, state.noShares, state.b, totalCredits, totalYesCredits, totalNoCredits]);
 
   const handleBet = async () => {
     if (!user) { toast("warning", "Sign in required", "Sign in with Google to place a bet"); return; }
@@ -67,6 +70,14 @@ export function BetForm({ marketId, yesOdds, yesShares, noShares, liquidityParam
     }
 
     toast("success", "Bet placed", `${credits.toLocaleString()} on ${side.toUpperCase()}`);
+
+    // Quest completion toasts
+    const completedQuests: string[] = data.completedQuests ?? [];
+    for (const qid of completedQuests) {
+      const q = QUEST_MAP.get(qid);
+      if (q) toast("quest", "Quest completed!", `${q.label} — +${q.reward.toLocaleString()} bananas`);
+    }
+
     setAmount("");
     router.refresh();
   };
@@ -108,16 +119,18 @@ export function BetForm({ marketId, yesOdds, yesShares, noShares, liquidityParam
                   <TooltipTrigger asChild>
                     <span className="inline-flex cursor-help items-center gap-1">
                       Est. payout: <Credits amount={preview.payout} className="font-semibold text-base-content" />
-                      <span className="text-base-content/30">=</span>
-                      <span className="text-base-content/60">{(parseInt(amount) || 0).toLocaleString()} + <span className="text-yes">{preview.profit.toLocaleString()}</span></span>
+                      <span className="text-base-content/30">·</span>
+                      <span className={`font-semibold ${preview.profit >= 0 ? "text-yes" : "text-no"}`}>
+                        {preview.profit >= 0 ? "+" : ""}{preview.profit.toLocaleString()} profit
+                      </span>
                       <Info className="h-3 w-3" />
                     </span>
                   </TooltipTrigger>
                   <TooltipContent side="top" sideOffset={8} className="!bg-base-200 max-w-64 space-y-1.5 rounded-lg border border-base-300 p-3 text-[11px] leading-relaxed !text-base-content shadow-xl [&>svg]:hidden">
                     <p className="font-semibold">How payouts work</p>
-                    <p className="text-base-content/70">If {side.toUpperCase()} wins, you get your {(parseInt(amount) || 0).toLocaleString()} bet back + {preview.profit.toLocaleString()} profit.</p>
-                    <p className="text-base-content/70">Based on current pool size. Payout changes as others bet.</p>
-                    <p className="text-base-content/40">{RAKE_PERCENT * 100}% fee on winnings. If {side === "yes" ? "NO" : "YES"} wins, you lose your bet.</p>
+                    <p className="text-base-content/70">If {side.toUpperCase()} wins, you receive <span className="font-semibold">{preview.payout.toLocaleString()}</span> total ({(parseInt(amount) || 0).toLocaleString()} bet {preview.profit >= 0 ? "+" : ""} {preview.profit.toLocaleString()} profit).</p>
+                    <p className="text-base-content/70">Payout changes as others bet.</p>
+                    <p className="text-base-content/40">If {side === "yes" ? "NO" : "YES"} wins, you lose your bet.</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

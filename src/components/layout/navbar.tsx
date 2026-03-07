@@ -16,9 +16,10 @@ const navLinks = [
 
 interface NavbarProps {
   user: User | null;
+  completedQuests: string[];
 }
 
-export function Navbar({ user }: NavbarProps) {
+export function Navbar({ user, completedQuests }: NavbarProps) {
   const pathname = usePathname();
 
   const handleSignOut = async () => {
@@ -60,7 +61,7 @@ export function Navbar({ user }: NavbarProps) {
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              <QuestPopup credits={user.credits} />
+              <QuestPopup credits={user.credits} completedQuests={completedQuests} />
               <div className="dropdown dropdown-end">
                 <div tabIndex={0} role="button" className="btn btn-ghost btn-sm gap-1.5 text-[13px]">
                   {user.avatarUrl ? (

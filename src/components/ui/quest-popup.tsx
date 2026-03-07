@@ -1,31 +1,24 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { Credits } from "@/components/ui/credits";
+import { QUESTS } from "@/lib/quests";
 import { Check, UserPlus, Target, Flame, PlusCircle } from "lucide-react";
 
-interface Quest {
-  id: string;
-  label: string;
-  reward: number;
-  completed: boolean;
-  icon: React.ReactNode;
-}
-
-// Mock quest state — will be replaced by real backend data
-const quests: Quest[] = [
-  { id: "signup", label: "Sign up to PolyMRR", reward: 10000, completed: true, icon: <UserPlus className="h-4 w-4" /> },
-  { id: "first-bet", label: "Place your first bet", reward: 1000, completed: true, icon: <Target className="h-4 w-4" /> },
-  { id: "underdog-bet", label: "Bet on a <30% outcome", reward: 1000, completed: false, icon: <Flame className="h-4 w-4" /> },
-  { id: "create-market", label: "Create a market", reward: 1000, completed: false, icon: <PlusCircle className="h-4 w-4" /> },
-];
+const ICONS: Record<string, React.ReactNode> = {
+  UserPlus: <UserPlus className="h-4 w-4" />,
+  Target: <Target className="h-4 w-4" />,
+  Flame: <Flame className="h-4 w-4" />,
+  PlusCircle: <PlusCircle className="h-4 w-4" />,
+};
 
 interface QuestPopupProps {
   credits: number;
+  completedQuests: string[];
 }
 
-export function QuestPopup({ credits }: QuestPopupProps) {
+export function QuestPopup({ credits, completedQuests }: QuestPopupProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -39,10 +32,12 @@ export function QuestPopup({ credits }: QuestPopupProps) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  const completed = quests.filter((q) => q.completed).length;
-  const total = quests.length;
-  const earned = quests.filter((q) => q.completed).reduce((sum, q) => sum + q.reward, 0);
-  const remaining = quests.filter((q) => !q.completed).reduce((sum, q) => sum + q.reward, 0);
+  const completedSet = useMemo(() => new Set(completedQuests), [completedQuests]);
+
+  const completed = QUESTS.filter((q) => completedSet.has(q.id)).length;
+  const total = QUESTS.length;
+  const earned = QUESTS.filter((q) => completedSet.has(q.id)).reduce((sum, q) => sum + q.reward, 0);
+  const remaining = QUESTS.filter((q) => !completedSet.has(q.id)).reduce((sum, q) => sum + q.reward, 0);
 
   return (
     <div className="relative" ref={ref}>
@@ -94,44 +89,47 @@ export function QuestPopup({ credits }: QuestPopupProps) {
 
             {/* Quest list */}
             <div className="px-2 py-2 space-y-0.5">
-              {quests.map((quest) => (
-                <div
-                  key={quest.id}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors ${
-                    quest.completed ? "opacity-60" : "bg-base-200/50"
-                  }`}
-                >
-                  {/* Icon */}
-                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                    quest.completed
-                      ? "bg-success/10 text-yes"
-                      : "bg-primary/10 text-primary"
-                  }`}>
-                    {quest.completed ? <Check className="h-4 w-4" /> : quest.icon}
-                  </div>
+              {QUESTS.map((quest) => {
+                const done = completedSet.has(quest.id);
+                return (
+                  <div
+                    key={quest.id}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors ${
+                      done ? "opacity-60" : "bg-base-200/50"
+                    }`}
+                  >
+                    {/* Icon */}
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                      done
+                        ? "bg-success/10 text-yes"
+                        : "bg-primary/10 text-primary"
+                    }`}>
+                      {done ? <Check className="h-4 w-4" /> : ICONS[quest.icon]}
+                    </div>
 
-                  {/* Text */}
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-[13px] font-medium ${quest.completed ? "line-through text-base-content/40" : ""}`}>
-                      {quest.label}
+                    {/* Text */}
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-[13px] font-medium ${done ? "line-through text-base-content/40" : ""}`}>
+                        {quest.label}
+                      </div>
+                    </div>
+
+                    {/* Reward */}
+                    <div className={`shrink-0 rounded-md px-2 py-1 ${
+                      done
+                        ? "bg-success/10"
+                        : "bg-primary/10"
+                    }`}>
+                      <Credits
+                        amount={quest.reward}
+                        prefix="+"
+                        size="xs"
+                        className={`font-bold ${done ? "text-yes" : "text-primary"}`}
+                      />
                     </div>
                   </div>
-
-                  {/* Reward */}
-                  <div className={`shrink-0 rounded-md px-2 py-1 ${
-                    quest.completed
-                      ? "bg-success/10"
-                      : "bg-primary/10"
-                  }`}>
-                    <Credits
-                      amount={quest.reward}
-                      prefix="+"
-                      size="xs"
-                      className={`font-bold ${quest.completed ? "text-yes" : "text-primary"}`}
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Footer */}

@@ -95,29 +95,24 @@ export function stateAfterBet(
 
 /**
  * Estimate payout if this side wins.
- * payout = (myShares / totalWinningShares) * totalPool * (1 - rake)
- * For the preview, totalWinningShares = existing shares on that side + myShares.
+ * Uses amount-proportional payouts: payout = (myBet / winningSideBets) * totalPool.
+ * This guarantees payout >= betAmount when your side wins (no negative profit).
  */
 export function estimatePayout(
-  state: LmsrState,
   side: "yes" | "no",
-  myShares: number,
+  betAmount: number,
   totalPool: number,
-  betAmount: number
+  totalYesCredits: number,
+  totalNoCredits: number,
 ): number {
-  const existingWinningShares = side === "yes" ? state.yesShares : state.noShares;
-  const totalWinningShares = existingWinningShares + myShares;
-  if (totalWinningShares <= 0) return 0;
   const newPool = totalPool + betAmount;
-  const gross = (myShares / totalWinningShares) * newPool;
-  return Math.floor(gross * (1 - RAKE_PERCENT));
+  const winningSideBets = (side === "yes" ? totalYesCredits : totalNoCredits) + betAmount;
+  if (winningSideBets <= 0) return 0;
+  return Math.floor((betAmount / winningSideBets) * newPool);
 }
 
 /** Default liquidity parameter for new markets */
 export const DEFAULT_LIQUIDITY = 500;
-
-/** Platform rake on winnings (5%) */
-export const RAKE_PERCENT = 0.05;
 
 /** Minimum bet in credits */
 export const MIN_BET = 50;

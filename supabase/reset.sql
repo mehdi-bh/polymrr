@@ -14,9 +14,11 @@ drop view if exists leaderboard cascade;
 
 drop function if exists place_bet(uuid, uuid, text, bigint);
 drop function if exists distribute_payout(uuid, integer, uuid, uuid);
+drop function if exists complete_quest(uuid, text, integer);
 drop function if exists sum_startup_revenue();
 drop function if exists tstz_to_date(timestamptz) cascade;
 
+drop table if exists user_quest_completions cascade;
 drop table if exists credit_transactions cascade;
 drop table if exists bets cascade;
 drop table if exists markets cascade;
@@ -148,6 +150,8 @@ create table markets (
   no_shares real not null default 0,
   liquidity_param real not null default 500,
   total_credits integer not null default 0,
+  total_yes_credits bigint not null default 0,
+  total_no_credits bigint not null default 0,
   total_bettors integer not null default 0,
   created_at timestamptz not null default now(),
   closes_at timestamptz not null,
@@ -188,6 +192,19 @@ create table credit_transactions (
 alter table credit_transactions enable row level security;
 create policy "Own read" on credit_transactions for select using (auth.uid() = user_id);
 
+-- Quest completions
+create table user_quest_completions (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references profiles on delete cascade,
+  quest_id text not null,
+  reward_amount integer not null,
+  completed_at timestamptz not null default now(),
+  unique (user_id, quest_id)
+);
+
+alter table user_quest_completions enable row level security;
+create policy "Own read" on user_quest_completions for select using (auth.uid() = user_id);
+
 -- Sync log
 create table sync_log (
   id bigint generated always as identity primary key,
@@ -206,6 +223,7 @@ create index idx_bets_market_side on bets (market_id, side);
 create index idx_bets_user on bets (user_id);
 create index idx_markets_startup on markets (startup_slug);
 create index idx_snapshots_slug_date on startup_snapshots (startup_slug, snapshot_date desc);
+create index idx_quest_completions_user on user_quest_completions (user_id);
 
 -- Immutable cast needed for index expressions (timestamptz->date depends on timezone)
 create or replace function tstz_to_date(ts timestamptz)
@@ -285,10 +303,12 @@ begin
     new.id,
     coalesce(new.raw_user_meta_data ->> 'full_name', 'Anonymous'),
     new.raw_user_meta_data ->> 'avatar_url',
-    1000
+    10000
   );
+  insert into public.user_quest_completions (user_id, quest_id, reward_amount)
+  values (new.id, 'signup', 10000);
   insert into public.credit_transactions (user_id, amount, reason)
-  values (new.id, 1000, 'signup_bonus');
+  values (new.id, 10000, 'quest_reward');
   return new;
 end;
 $$;
@@ -384,6 +404,8 @@ begin
     no_shares     = v_new_no,
     yes_odds      = round(100.0 * exp(v_new_yes / v_b - v_max) / (exp(v_new_yes / v_b - v_max) + exp(v_new_no / v_b - v_max)))::integer,
     total_credits = total_credits + p_amount,
+    total_yes_credits = total_yes_credits + case when p_side = 'yes' then p_amount else 0 end,
+    total_no_credits = total_no_credits + case when p_side = 'no' then p_amount else 0 end,
     total_bettors = v_distinct_bettors
   where id = p_market_id;
 
@@ -420,6 +442,31 @@ begin
   update profiles set credits = credits + p_amount where id = p_user_id;
   insert into credit_transactions (user_id, amount, reason, ref_bet_id, ref_market_id)
   values (p_user_id, p_amount, 'bet_won', p_bet_id, p_market_id);
+end;
+$$ language plpgsql security definer;
+
+create or replace function complete_quest(
+  p_user_id uuid,
+  p_quest_id text,
+  p_reward integer
+) returns boolean as $$
+begin
+  if exists (
+    select 1 from user_quest_completions
+    where user_id = p_user_id and quest_id = p_quest_id
+  ) then
+    return false;
+  end if;
+
+  insert into user_quest_completions (user_id, quest_id, reward_amount)
+  values (p_user_id, p_quest_id, p_reward);
+
+  update profiles set credits = credits + p_reward where id = p_user_id;
+
+  insert into credit_transactions (user_id, amount, reason)
+  values (p_user_id, p_reward, 'quest_reward');
+
+  return true;
 end;
 $$ language plpgsql security definer;
 

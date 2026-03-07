@@ -107,6 +107,8 @@ export interface Market {
   noShares: number;
   liquidityParam: number;
   totalCredits: number;
+  totalYesCredits: number;
+  totalNoCredits: number;
   totalBettors: number;
   createdAt: string;
   closesAt: string;
