@@ -11,7 +11,7 @@ import {
   getMrrHistory,
   formatCents,
 } from "@/lib/data";
-import { ExternalLink, TrendingUp, TrendingDown, Users, Calendar } from "lucide-react";
+import { ExternalLink, TrendingUp, TrendingDown, Users, Calendar, Plus } from "lucide-react";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -72,6 +72,13 @@ export default async function StartupPage({ params }: PageProps) {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Link
+                href={`/markets/create?startup=${startup.slug}`}
+                className="btn btn-primary btn-sm gap-1.5"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Create Market
+              </Link>
               {startup.website && (
                 <a
                   href={startup.website}

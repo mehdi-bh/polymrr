@@ -73,3 +73,8 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
+
+@keyframes toast-progress {
+  from { width: 100%; }
+  to { width: 0%; }
+}

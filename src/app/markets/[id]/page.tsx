@@ -98,6 +98,7 @@ export default async function MarketPage({ params }: PageProps) {
             <ShareMarketButton
               question={market.question}
               startupName={startup.name}
+              startupIcon={startup.icon}
               yesOdds={market.yesOdds}
               marketId={market.id}
             />

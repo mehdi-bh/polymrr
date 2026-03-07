@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { formatCents } from "./helpers";
+import type { Startup } from "./types";
 
 export type MetricId =
   | "mrr"
@@ -208,6 +209,115 @@ export async function findDuplicate(supabase: any, blueprint: MarketBlueprint): 
 
   return (data?.length ?? 0) > 0;
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// ---------------------------------------------------------------------------
+// Metric descriptions (for tooltips)
+// ---------------------------------------------------------------------------
+
+export const METRIC_DESCRIPTIONS: Record<MetricId, string> = {
+  mrr: "Monthly Recurring Revenue from active subscriptions",
+  revenue_30d: "Total revenue in the last 30 days, including one-time sales",
+  revenue_total: "All-time total revenue since launch",
+  customers: "Total number of paying customers",
+  active_subs: "Currently active subscriptions",
+  growth_30d: "Month-over-month revenue growth rate",
+  profit_margin: "Percentage of revenue that is profit after costs",
+  on_sale: "Whether the startup is listed for sale on a marketplace",
+};
+
+// ---------------------------------------------------------------------------
+// Bet suggestions
+// ---------------------------------------------------------------------------
+
+export interface BetSuggestion {
+  label: string;
+  description: string;
+  metric: MetricId;
+  condition: ConditionId;
+  target: number; // DB units (cents, decimal, count)
+  daysFromNow: number;
+}
+
+function niceRoundCents(cents: number): number {
+  const d = cents / 100;
+  if (d >= 100_000) return Math.round(d / 25_000) * 25_000 * 100;
+  if (d >= 10_000) return Math.round(d / 5_000) * 5_000 * 100;
+  if (d >= 1_000) return Math.round(d / 500) * 500 * 100;
+  if (d >= 100) return Math.round(d / 50) * 50 * 100;
+  return Math.round(d / 10) * 10 * 100;
+}
+
+function niceRoundCount(n: number): number {
+  if (n >= 10_000) return Math.round(n / 5_000) * 5_000;
+  if (n >= 1_000) return Math.round(n / 500) * 500;
+  if (n >= 100) return Math.round(n / 50) * 50;
+  return Math.round(n / 10) * 10;
+}
+
+export function generateSuggestions(startup: Startup): BetSuggestion[] {
+  const suggestions: BetSuggestion[] = [];
+  const mrr = startup.revenue.mrr;
+  const growth = startup.growth30d ?? 0;
+
+  // 1. Optimistic MRR target (3 months)
+  if (mrr > 0) {
+    const projected = mrr * Math.pow(1 + Math.max(growth, 0.05), 3);
+    const target = niceRoundCents(Math.round(projected * 1.15));
+    suggestions.push({
+      label: `Reach ${formatCents(target)} MRR`,
+      description: `Currently ${formatCents(mrr)}, ${growth >= 0 ? "+" : ""}${(growth * 100).toFixed(0)}%/mo`,
+      metric: "mrr",
+      condition: "gte",
+      target,
+      daysFromNow: 90,
+    });
+  }
+
+  // 2. Customer milestone
+  if (startup.customers > 10) {
+    const target = niceRoundCount(Math.round(startup.customers * 1.5));
+    suggestions.push({
+      label: `Reach ${target.toLocaleString()} customers`,
+      description: `Currently at ${startup.customers.toLocaleString()}`,
+      metric: "customers",
+      condition: "gte",
+      target,
+      daysFromNow: 90,
+    });
+  }
+
+  // 3. Bearish / drop bet
+  if (mrr > 0) {
+    const target = niceRoundCents(Math.round(mrr * 0.7));
+    suggestions.push({
+      label: `Drop below ${formatCents(target)} MRR`,
+      description: "Testing the downside risk",
+      metric: "mrr",
+      condition: "lte",
+      target,
+      daysFromNow: 180,
+    });
+  }
+
+  // 4. Listed for sale (if not already)
+  if (!startup.onSale) {
+    suggestions.push({
+      label: "Listed for sale",
+      description: "Will they put it on the market?",
+      metric: "on_sale",
+      condition: "eq",
+      target: 1,
+      daysFromNow: 180,
+    });
+  }
+
+  return suggestions.slice(0, 4);
+}
+
+// ---------------------------------------------------------------------------
+// Resolution
+// ---------------------------------------------------------------------------
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function resolveMarket(config: { metric: string; condition: string; target: number; dbColumn: string }, startupRow: any): "yes" | "no" | null {

@@ -6,16 +6,38 @@ import { Share2, Download, X, Copy, Check } from "lucide-react";
 interface ShareMarketButtonProps {
   question: string;
   startupName: string;
+  startupIcon?: string | null;
   yesOdds: number;
   marketId: string;
   className?: string;
   size?: "sm" | "md";
 }
 
-function generateShareImage(
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Fetch as blob to avoid CORS issues with canvas
+      const res = await fetch(src);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(img);
+      };
+      img.onerror = reject;
+      img.src = url;
+    } catch {
+      reject(new Error("Failed to load image"));
+    }
+  });
+}
+
+async function generateShareImage(
   question: string,
   startupName: string,
   yesOdds: number,
+  startupIcon?: string | null,
 ): Promise<Blob> {
   const w = 1200;
   const h = 630;
@@ -38,10 +60,28 @@ function generateShareImage(
   ctx.font = "bold 28px system-ui, sans-serif";
   ctx.fillText("PolyMRR", 60, 70);
 
-  // Startup name
+  // Startup icon + name
+  const nameY = 120;
+  let nameX = 60;
+  if (startupIcon) {
+    try {
+      const img = await loadImage(startupIcon);
+      const iconSize = 32;
+      const iconY = nameY - iconSize + 6;
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(60, iconY, iconSize, iconSize, 6);
+      ctx.clip();
+      ctx.drawImage(img, 60, iconY, iconSize, iconSize);
+      ctx.restore();
+      nameX = 60 + iconSize + 12;
+    } catch {
+      // icon failed to load, skip it
+    }
+  }
   ctx.fillStyle = "#a0a0b0";
   ctx.font = "500 22px system-ui, sans-serif";
-  ctx.fillText(startupName, 60, 120);
+  ctx.fillText(startupName, nameX, nameY);
 
   // Question (word wrap)
   ctx.fillStyle = "#e5e5e5";
@@ -112,6 +152,7 @@ function generateShareImage(
 export function ShareMarketButton({
   question,
   startupName,
+  startupIcon,
   yesOdds,
   marketId,
   className,
@@ -126,7 +167,7 @@ export function ShareMarketButton({
     e.preventDefault();
     e.stopPropagation();
     setOpen(true);
-    const b = await generateShareImage(question, startupName, yesOdds);
+    const b = await generateShareImage(question, startupName, yesOdds, startupIcon);
     setBlob(b);
     setImageUrl(URL.createObjectURL(b));
   };
@@ -185,9 +226,9 @@ export function ShareMarketButton({
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={handleClose}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] bg-base-200/90 backdrop-blur-md" onClick={handleClose}>
           <div
-            className="card w-full max-w-xl bg-base-100 border border-base-300 shadow-2xl mx-4"
+            className="card w-full max-w-xl bg-base-100 border border-base-300 shadow-2xl mx-4 animate-fade-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="card-body gap-4 p-5">
@@ -198,11 +239,11 @@ export function ShareMarketButton({
                 </button>
               </div>
 
-              <div className="overflow-hidden rounded-lg border border-base-300 bg-base-200">
+              <div className="overflow-hidden rounded-lg">
                 {imageUrl ? (
                   <img src={imageUrl} alt="Share preview" className="w-full" />
                 ) : (
-                  <div className="flex h-48 items-center justify-center text-sm text-base-content/50">
+                  <div className="flex h-48 items-center justify-center rounded-lg text-sm text-base-content/50 bg-base-200">
                     Generating image...
                   </div>
                 )}

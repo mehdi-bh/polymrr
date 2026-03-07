@@ -67,6 +67,7 @@ export function MarketCard({ market, startup }: MarketCardProps) {
             <ShareMarketButton
               question={market.question}
               startupName={startup.name}
+              startupIcon={startup.icon}
               yesOdds={market.yesOdds}
               marketId={market.id}
               size="sm"
