@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inconsolata } from "next/font/google";
 import { Navbar } from "@/components/layout/navbar";
+import { ToastProvider } from "@/components/ui/toast";
 import { getCurrentUser } from "@/lib/data";
 import "./globals.css";
 
@@ -21,8 +22,10 @@ export default async function RootLayout({
   return (
     <html lang="en" data-theme="polymrr">
       <body className={`${inconsolata.variable} font-sans antialiased`}>
-        <Navbar user={user} />
-        <main className="mx-auto max-w-7xl px-4 py-8">{children}</main>
+        <ToastProvider>
+          <Navbar user={user} />
+          <main className="mx-auto max-w-7xl px-4 py-8">{children}</main>
+        </ToastProvider>
       </body>
     </html>
   );

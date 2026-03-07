@@ -71,33 +71,13 @@ export default async function StartupPage({ params }: PageProps) {
                 <p className="mt-0.5 text-sm text-base-content/50">{startup.description}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Link
-                href={`/markets/create?startup=${startup.slug}`}
-                className="btn btn-primary btn-sm gap-1.5"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Create Market
-              </Link>
-              {startup.website && (
-                <a
-                  href={startup.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-sm text-primary transition-colors hover:brightness-125"
-                >
-                  Website <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              )}
-              <a
-                href={`https://trustmrr.com/startup/${startup.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-sm text-base-content/50 transition-colors hover:text-base-content"
-              >
-                TrustMRR <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-            </div>
+            <Link
+              href={`/markets/create?startup=${startup.slug}`}
+              className="btn btn-primary btn-sm gap-1.5 shrink-0"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Create Market
+            </Link>
           </div>
 
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -127,15 +107,37 @@ export default async function StartupPage({ params }: PageProps) {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {startup.category && <span className="badge badge-primary badge-outline badge-sm">{startup.category}</span>}
-            <span className="badge badge-neutral badge-sm">{startup.paymentProvider}</span>
-            {startup.foundedDate && (
-              <span className="badge badge-neutral badge-sm gap-1">
-                <Calendar className="h-3 w-3" />
-                {new Date(startup.foundedDate).getFullYear()}
-              </span>
-            )}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              {startup.category && <span className="badge badge-primary badge-outline badge-sm">{startup.category}</span>}
+              <span className="badge badge-neutral badge-sm">{startup.paymentProvider}</span>
+              {startup.foundedDate && (
+                <span className="badge badge-neutral badge-sm gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {new Date(startup.foundedDate).getFullYear()}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {startup.website && (
+                <a
+                  href={startup.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-primary transition-colors hover:brightness-125"
+                >
+                  Website <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+              <a
+                href={`https://trustmrr.com/startup/${startup.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-base-content/50 transition-colors hover:text-base-content"
+              >
+                TrustMRR <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
           </div>
         </div>
       </div>

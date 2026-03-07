@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser, getStartups } from "@/lib/data";
 import { CreateMarketForm } from "@/components/market/create-market-form";
-import { ToastProvider } from "@/components/ui/toast";
 
 interface PageProps {
   searchParams: Promise<{ startup?: string }>;
@@ -23,14 +22,12 @@ export default async function CreateMarketPage({ searchParams }: PageProps) {
     : undefined;
 
   return (
-    <ToastProvider>
-      <div className="container mx-auto max-w-4xl px-4 py-8">
-        <CreateMarketForm
-          startups={startups}
-          user={user}
-          initialStartupSlug={initialStartupSlug}
-        />
-      </div>
-    </ToastProvider>
+    <div className="container mx-auto max-w-4xl px-4 py-8">
+      <CreateMarketForm
+        startups={startups}
+        user={user}
+        initialStartupSlug={initialStartupSlug}
+      />
+    </div>
   );
 }
