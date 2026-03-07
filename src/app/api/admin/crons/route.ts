@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { logSync } from "@/lib/trustmrr";
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -110,18 +111,28 @@ export async function POST(request: Request) {
   // Create the sync_log entry HERE so the client can poll it immediately
   const logId = await logSync(admin, job.source, "running");
 
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000";
+  const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000";
 
-  // Fire-and-forget — pass logId so the cron reuses it instead of creating a new one
-  fetch(`${baseUrl}${job.path}`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${process.env.CRON_SECRET}`,
-      "x-log-id": String(logId),
-    },
-  }).catch(() => {});
+  // Use after() to keep the function alive until the fetch completes on Vercel
+  after(async () => {
+    try {
+      console.log(`[admin/crons] Triggering ${job.id} at ${baseUrl}${job.path} with logId=${logId}`);
+      const res = await fetch(`${baseUrl}${job.path}`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${process.env.CRON_SECRET}`,
+          "x-log-id": String(logId),
+        },
+      });
+      console.log(`[admin/crons] ${job.id} trigger response: ${res.status}`);
+    } catch (err) {
+      console.error(`[admin/crons] Failed to trigger ${job.id}:`, err);
+    }
+  });
 
   return NextResponse.json({ ok: true, logId });
 }

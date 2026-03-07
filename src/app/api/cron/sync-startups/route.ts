@@ -19,7 +19,7 @@ import {
   updateProgress,
   isCancelled,
 } from "@/lib/trustmrr";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 
 export const maxDuration = 300;
 
@@ -115,17 +115,25 @@ export async function POST(request: Request) {
 
     // Re-invoke if there's more work
     if (!done) {
-      const baseUrl = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000";
-      fetch(`${baseUrl}/api/cron/sync-startups`, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${process.env.CRON_SECRET}`,
-          ...(logId ? { "x-log-id": String(logId) } : {}),
-          "x-page": String(page),
-        },
-      }).catch(() => {});
+      const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000";
+      after(async () => {
+        try {
+          await fetch(`${baseUrl}/api/cron/sync-startups`, {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${process.env.CRON_SECRET}`,
+              ...(logId ? { "x-log-id": String(logId) } : {}),
+              "x-page": String(page),
+            },
+          });
+        } catch (err) {
+          console.error("[sync-startups] Re-invoke failed:", err);
+        }
+      });
     }
 
     return NextResponse.json({ ok: true, synced, page, total, done });

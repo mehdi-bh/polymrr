@@ -9,7 +9,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { scrapeMrrHistory } from "@/lib/scraper";
 import { storeMrrHistory, getOrCreateLogId, updateSyncLog, updateProgress, isCancelled } from "@/lib/trustmrr";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 
 export const maxDuration = 300;
 
@@ -110,16 +110,24 @@ export async function POST(request: Request) {
 
     // Self-re-invoke if there's remaining work, passing logId for dashboard tracking
     if (summary.pending > 0) {
-      const baseUrl = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000";
-      fetch(`${baseUrl}/api/cron/scrape-mrr`, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${process.env.CRON_SECRET}`,
-          ...(logId ? { "x-log-id": String(logId) } : {}),
-        },
-      }).catch(() => {}); // fire-and-forget
+      const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000";
+      after(async () => {
+        try {
+          await fetch(`${baseUrl}/api/cron/scrape-mrr`, {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${process.env.CRON_SECRET}`,
+              ...(logId ? { "x-log-id": String(logId) } : {}),
+            },
+          });
+        } catch (err) {
+          console.error("[scrape-mrr] Re-invoke failed:", err);
+        }
+      });
     }
 
     return NextResponse.json({ ok: true, ...summary });
