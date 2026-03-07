@@ -185,7 +185,7 @@ export async function logSync(
   return data.id;
 }
 
-/** Update an existing sync_log entry */
+/** Update an existing sync_log entry (won't overwrite "cancelled" status) */
 export async function updateSyncLog(
   admin: Admin,
   id: number,
@@ -195,5 +195,57 @@ export async function updateSyncLog(
   await admin
     .from("sync_log")
     .update({ status, details })
+    .eq("id", id)
+    .neq("status", "cancelled");
+}
+
+/** Update progress on a running sync_log entry (keeps last 50 log lines).
+ *  Pass line=null to update counters without adding a log line. */
+export async function updateProgress(
+  admin: Admin,
+  id: number,
+  processed: number,
+  total: number,
+  line: string | null,
+  prevLines: string[]
+) {
+  const lines = line ? [...prevLines, line].slice(-50) : prevLines;
+  const { error } = await admin
+    .from("sync_log")
+    .update({
+      details: { processed, total, lines },
+    })
     .eq("id", id);
+  if (error) console.error(`[updateProgress] FAILED id=${id}: ${error.message}`);
+  return lines;
+}
+
+/** Check if a sync_log entry has been cancelled */
+export async function isCancelled(admin: Admin, id: number): Promise<boolean> {
+  const { data } = await admin
+    .from("sync_log")
+    .select("status")
+    .eq("id", id)
+    .single();
+  return data?.status === "cancelled";
+}
+
+/** Get logId from x-log-id header (set by admin trigger), or create a new sync_log entry */
+export async function getOrCreateLogId(
+  admin: Admin,
+  request: Request,
+  source: string
+): Promise<number | null> {
+  const headerLogId = request.headers.get("x-log-id");
+  console.log(`[getOrCreateLogId] source=${source} x-log-id header="${headerLogId}"`);
+  if (headerLogId) {
+    const id = parseInt(headerLogId, 10);
+    if (!isNaN(id)) {
+      console.log(`[getOrCreateLogId] Reusing logId=${id} from header`);
+      return id;
+    }
+  }
+  const newId = await logSync(admin, source, "running");
+  console.log(`[getOrCreateLogId] Created new logId=${newId}`);
+  return newId;
 }

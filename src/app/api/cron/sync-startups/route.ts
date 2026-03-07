@@ -1,26 +1,30 @@
 /**
- * Daily full sync cron — fetches ALL startups from TrustMRR.
+ * Daily full sync cron — syncs startups from TrustMRR.
  *
- * Schedule: 2:00 AM UTC daily (configured in vercel.json)
- * Strategy: paginate list endpoint, then fetch detail for each startup.
- *           Processes in batches; self-re-invokes if there's remaining work.
+ * Strategy: paginate the list endpoint one page at a time (50/page).
+ * For each startup, fetch detail (for xFollowerCount, techStack, cofounders)
+ * and upsert. Stops before timeout and re-invokes with the same logId.
+ *
+ * Uses `x-page` header for continuation so we don't re-fetch pages.
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  fetchAllSlugs,
+  listStartups,
   getStartupDetail,
   upsertStartup,
   storeSnapshot,
-  logSync,
+  getOrCreateLogId,
   updateSyncLog,
+  updateProgress,
+  isCancelled,
 } from "@/lib/trustmrr";
 import { NextResponse } from "next/server";
 
 export const maxDuration = 300;
 
-const BATCH_SIZE = 80;
-const SAFE_TIME_MS = 270_000; // stop 30s before maxDuration to leave room for cleanup
+const PAGE_SIZE = 50;
+const SAFE_TIME_MS = 250_000; // stop 50s before maxDuration
 
 export async function POST(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -29,75 +33,102 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
-  const logId = await logSync(admin, "trustmrr_full_daily", "running");
+  const logId = await getOrCreateLogId(admin, request, "trustmrr_full_daily");
+  const startPage = parseInt(request.headers.get("x-page") ?? "1", 10);
   const startedAt = Date.now();
 
+  // Carry over cumulative synced count from previous invocations
+  let prevSynced = 0;
+  let lines: string[] = [];
+  if (logId && startPage > 1) {
+    const { data: prevLog } = await admin.from("sync_log").select("details").eq("id", logId).maybeSingle();
+    const prevDetails = prevLog?.details as { synced?: number; lines?: string[] } | null;
+    prevSynced = prevDetails?.synced ?? 0;
+    lines = prevDetails?.lines ?? [];
+  }
+
+  let synced = prevSynced;
+  let page = startPage;
+  let total = 0;
+  const errors: string[] = [];
+
   try {
-    console.log("[sync-startups] Starting full sync...");
-    const startupList = await fetchAllSlugs();
-    console.log(`[sync-startups] Found ${startupList.length} startups to sync`);
+    if (logId) lines = await updateProgress(admin, logId, synced, 0, `Starting from page ${page}...`, lines);
 
-    // Only sync startups not already synced in the last hour (skip already-done batches)
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { data: recentlySynced } = await admin
-      .from("startups")
-      .select("slug")
-      .gte("synced_at", oneHourAgo);
+    let hasMore = true;
 
-    const recentSet = new Set((recentlySynced ?? []).map((s) => s.slug));
-    const remaining = startupList.filter((item) => !recentSet.has(item.slug));
-    const batch = remaining.slice(0, BATCH_SIZE);
-
-    console.log(`[sync-startups] ${remaining.length} remaining, processing ${batch.length}`);
-
-    let synced = 0;
-    const errors: string[] = [];
-
-    for (const item of batch) {
-      // Stop early if approaching timeout
+    while (hasMore) {
       if (Date.now() - startedAt > SAFE_TIME_MS) {
-        console.log("[sync-startups] Approaching timeout, stopping early");
+        if (logId) lines = await updateProgress(admin, logId, synced, total, `Timeout — ${synced} synced, will continue from page ${page}`, lines);
         break;
       }
 
-      try {
-        const detail = await getStartupDetail(item.slug);
-        await upsertStartup(admin, detail);
-        await storeSnapshot(admin, detail);
-        synced++;
-        console.log(`[sync-startups] ${synced}/${batch.length} ${item.slug} OK`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[sync-startups] ${item.slug} FAILED: ${msg}`);
-        errors.push(`${item.slug}: ${msg}`);
+      if (logId && await isCancelled(admin, logId)) {
+        if (logId) lines = await updateProgress(admin, logId, synced, total, "Cancelled by user", lines);
+        hasMore = false;
+        break;
       }
+
+      const listRes = await listStartups({ page, limit: PAGE_SIZE, sort: "revenue-desc" });
+      total = listRes.meta.total;
+      hasMore = listRes.meta.hasMore;
+
+      if (logId) lines = await updateProgress(admin, logId, synced, total, `Page ${page}: ${listRes.data.length} startups`, lines);
+
+      for (const item of listRes.data) {
+        if (Date.now() - startedAt > SAFE_TIME_MS) break;
+        if (logId && synced % 10 === 0 && await isCancelled(admin, logId)) break;
+
+        try {
+          const detail = await getStartupDetail(item.slug);
+          await upsertStartup(admin, detail);
+          await storeSnapshot(admin, detail);
+          synced++;
+          if (logId) {
+            const line = synced % 5 === 0 ? `${synced}/${total} ${item.slug} OK` : null;
+            lines = await updateProgress(admin, logId, synced, total, line, lines);
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          errors.push(`${item.slug}: ${msg}`);
+          if (logId) lines = await updateProgress(admin, logId, synced, total, `${item.slug} FAILED: ${msg}`, lines);
+        }
+      }
+
+      if (Date.now() - startedAt > SAFE_TIME_MS) break;
+
+      page++;
     }
 
-    const pending = remaining.length - synced;
-    console.log(`[sync-startups] Batch done: ${synced} synced, ${pending} pending`);
+    const done = !hasMore;
+    console.log(`[sync-startups] ${synced} synced, page=${page}, done=${done}`);
 
     if (logId) {
-      await updateSyncLog(admin, logId, pending > 0 ? "partial" : "completed", {
-        total: startupList.length,
+      await updateSyncLog(admin, logId, done ? "completed" : "running", {
         synced,
-        pending,
+        page,
+        total,
         errors: errors.length > 0 ? errors.slice(0, 20) : undefined,
-        completed_at: new Date().toISOString(),
+        ...(done ? { completed_at: new Date().toISOString() } : {}),
       });
     }
 
-    // Self-re-invoke if there's remaining work
-    if (pending > 0) {
+    // Re-invoke if there's more work
+    if (!done) {
       const baseUrl = process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
         : "http://localhost:3000";
       fetch(`${baseUrl}/api/cron/sync-startups`, {
         method: "POST",
-        headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
-      }).catch(() => {}); // fire-and-forget
+        headers: {
+          authorization: `Bearer ${process.env.CRON_SECRET}`,
+          ...(logId ? { "x-log-id": String(logId) } : {}),
+          "x-page": String(page),
+        },
+      }).catch(() => {});
     }
 
-    return NextResponse.json({ ok: true, synced, pending, total: startupList.length });
+    return NextResponse.json({ ok: true, synced, page, total, done });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[sync-startups] Fatal: ${msg}`);
@@ -105,6 +136,8 @@ export async function POST(request: Request) {
     if (logId) {
       await updateSyncLog(admin, logId, "failed", {
         error: msg,
+        synced,
+        page,
         completed_at: new Date().toISOString(),
       });
     }

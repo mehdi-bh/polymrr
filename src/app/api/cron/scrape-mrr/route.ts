@@ -8,7 +8,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { scrapeMrrHistory } from "@/lib/scraper";
-import { storeMrrHistory, logSync, updateSyncLog } from "@/lib/trustmrr";
+import { storeMrrHistory, getOrCreateLogId, updateSyncLog, updateProgress, isCancelled } from "@/lib/trustmrr";
 import { NextResponse } from "next/server";
 
 export const maxDuration = 300;
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
-  const logId = await logSync(admin, "mrr_scrape", "running");
+  const logId = await getOrCreateLogId(admin, request, "mrr_scrape");
 
   try {
     const { data: allStartups } = await admin
@@ -53,22 +53,41 @@ export async function POST(request: Request) {
 
     let succeeded = 0;
     const errors: string[] = [];
+    let lines: string[] = [];
+    let processed = 0;
+
+    if (logId) {
+      lines = await updateProgress(admin, logId, 0, toScrape.length, `${neverScraped.length} new, ${stale.length} stale, scraping ${toScrape.length}`, lines);
+    }
 
     for (const { slug } of toScrape) {
+      if (logId && await isCancelled(admin, logId)) {
+        console.log("[scrape-mrr] Cancelled by user");
+        lines = await updateProgress(admin, logId, processed, toScrape.length, "Cancelled by user", lines);
+        break;
+      }
+
+      processed++;
       try {
         const points = await scrapeMrrHistory(slug);
 
         if (points && points.length > 0) {
           await storeMrrHistory(admin, slug, points);
           succeeded++;
-          console.log(`[scrape-mrr] ${slug}: ${points.length} months stored`);
+          const line = `${processed}/${toScrape.length} ${slug}: ${points.length} months stored`;
+          console.log(`[scrape-mrr] ${line}`);
+          if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, line, lines);
         } else {
-          console.log(`[scrape-mrr] ${slug}: no data`);
+          const line = `${processed}/${toScrape.length} ${slug}: no data`;
+          console.log(`[scrape-mrr] ${line}`);
+          if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, line, lines);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[scrape-mrr] ${slug}: ${msg}`);
+        const line = `${processed}/${toScrape.length} ${slug}: FAILED ${msg}`;
+        console.error(`[scrape-mrr] ${line}`);
         errors.push(`${slug}: ${msg}`);
+        if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, line, lines);
       }
 
       await new Promise((r) => setTimeout(r, DELAY_MS));
@@ -87,16 +106,19 @@ export async function POST(request: Request) {
 
     console.log(`[scrape-mrr] Done: ${succeeded}/${toScrape.length}`);
 
-    if (logId) await updateSyncLog(admin, logId, summary.pending > 0 ? "partial" : "completed", summary);
+    if (logId) await updateSyncLog(admin, logId, summary.pending > 0 ? "running" : "completed", summary);
 
-    // Self-re-invoke if there's remaining work
+    // Self-re-invoke if there's remaining work, passing logId for dashboard tracking
     if (summary.pending > 0) {
       const baseUrl = process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
         : "http://localhost:3000";
       fetch(`${baseUrl}/api/cron/scrape-mrr`, {
         method: "POST",
-        headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
+        headers: {
+          authorization: `Bearer ${process.env.CRON_SECRET}`,
+          ...(logId ? { "x-log-id": String(logId) } : {}),
+        },
       }).catch(() => {}); // fire-and-forget
     }
 

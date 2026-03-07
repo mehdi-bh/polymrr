@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { resolveMarket } from "@/lib/market-templates";
+import { getOrCreateLogId, updateSyncLog, updateProgress, isCancelled } from "@/lib/trustmrr";
 
 export const maxDuration = 300;
 
@@ -15,6 +16,7 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
+  const logId = await getOrCreateLogId(admin, request, "resolve_markets");
 
   // Phase 1: Close expired markets
   const { data: closedMarkets } = await admin
@@ -33,11 +35,28 @@ export async function POST(request: Request) {
 
   let resolved = 0;
   const errors: string[] = [];
+  const pending = pendingMarkets ?? [];
+  let lines: string[] = [];
 
-  for (const market of pendingMarkets ?? []) {
+  if (logId) {
+    lines = await updateProgress(admin, logId, 0, pending.length, `Closed ${closedMarkets?.length ?? 0} expired markets, ${pending.length} to resolve`, lines);
+  }
+
+  for (let i = 0; i < pending.length; i++) {
+    if (logId && await isCancelled(admin, logId)) {
+      console.log("[resolve-markets] Cancelled by user");
+      lines = await updateProgress(admin, logId, i, pending.length, "Cancelled by user", lines);
+      break;
+    }
+
+    const market = pending[i];
     try {
       const outcome = determineOutcome(market);
-      if (outcome === null) continue;
+      if (outcome === null) {
+        const line = `${i + 1}/${pending.length} ${market.id.slice(0, 8)} skipped (undetermined)`;
+        if (logId) lines = await updateProgress(admin, logId, i + 1, pending.length, line, lines);
+        continue;
+      }
 
       // Distribute payouts BEFORE marking as resolved to avoid
       // partial state where market is "resolved" but payouts missing
@@ -53,18 +72,30 @@ export async function POST(request: Request) {
         .eq("id", market.id);
 
       resolved++;
+      const line = `${i + 1}/${pending.length} ${market.id.slice(0, 8)} resolved: ${outcome}`;
+      if (logId) lines = await updateProgress(admin, logId, i + 1, pending.length, line, lines);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[resolve-markets] ${market.id} FAILED: ${msg}`);
       errors.push(`${market.id}: ${msg}`);
+      const line = `${i + 1}/${pending.length} ${market.id.slice(0, 8)} FAILED: ${msg}`;
+      if (logId) lines = await updateProgress(admin, logId, i + 1, pending.length, line, lines);
     }
   }
 
-  return NextResponse.json({
+  const summary = {
     closed: closedMarkets?.length ?? 0,
     resolved,
+    pending: (pendingMarkets?.length ?? 0) - resolved,
     errors: errors.length > 0 ? errors : undefined,
-  });
+    completed_at: new Date().toISOString(),
+  };
+
+  if (logId) {
+    await updateSyncLog(admin, logId, errors.length > 0 ? "partial" : "completed", summary);
+  }
+
+  return NextResponse.json(summary);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

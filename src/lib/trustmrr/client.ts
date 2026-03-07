@@ -1,9 +1,8 @@
 /**
  * TrustMRR API client with built-in rate limiting.
  *
- * Rate limit is configurable via TRUSTMRR_RATE_LIMIT env var (default: 20 req/min).
- * The client also respects rate-limit headers returned by the API:
- *   x-ratelimit-remaining, x-ratelimit-reset, retry-after
+ * Respects server rate-limit headers (x-ratelimit-remaining, x-ratelimit-reset, retry-after)
+ * and enforces a local sliding window as a safety net.
  */
 
 const BASE_URL = "https://trustmrr.com/api/v1";
@@ -12,28 +11,52 @@ const BASE_URL = "https://trustmrr.com/api/v1";
 // Rate limiter
 // ---------------------------------------------------------------------------
 
-const RATE_LIMIT = parseInt(process.env.TRUSTMRR_RATE_LIMIT ?? "20", 10);
-const WINDOW_MS = 60_000; // 1 minute
+const LOCAL_RATE_LIMIT = parseInt(process.env.TRUSTMRR_RATE_LIMIT ?? "20", 10);
+const WINDOW_MS = 60_000;
+const MAX_RETRIES = 3;
 
 let requestTimestamps: number[] = [];
-let serverResetAt: number | null = null;
+let pauseUntil: number | null = null;
+
+function parseResetTimestamp(value: string): number | null {
+  const num = parseInt(value, 10);
+  if (isNaN(num)) return null;
+  // If it looks like a unix timestamp in seconds (reasonable range: 2020-2040)
+  if (num > 1_577_836_800 && num < 2_524_608_000) {
+    return num * 1000;
+  }
+  // If it's already in milliseconds (> year 2020 in ms)
+  if (num > 1_577_836_800_000) {
+    return num;
+  }
+  // Otherwise treat as seconds-from-now
+  return Date.now() + num * 1000;
+}
+
+function sleep(ms: number): Promise<void> {
+  // Clamp to avoid Node.js 32-bit overflow warning
+  return new Promise((r) => setTimeout(r, Math.min(ms, 120_000)));
+}
 
 async function waitForSlot(): Promise<void> {
-  // If the server told us to wait until a specific time, respect that first
-  if (serverResetAt && Date.now() < serverResetAt) {
-    const wait = serverResetAt - Date.now() + 100; // small buffer
-    await new Promise((r) => setTimeout(r, wait));
-    serverResetAt = null;
+  // Respect server-imposed pause
+  if (pauseUntil && Date.now() < pauseUntil) {
+    const wait = pauseUntil - Date.now() + 200;
+    console.log(`[trustmrr] Waiting ${Math.round(wait / 1000)}s for rate limit reset`);
+    await sleep(wait);
+    pauseUntil = null;
+    requestTimestamps = [];
   }
 
-  // Sliding window: remove timestamps older than 1 minute
+  // Local sliding window
   const now = Date.now();
   requestTimestamps = requestTimestamps.filter((t) => now - t < WINDOW_MS);
 
-  if (requestTimestamps.length >= RATE_LIMIT) {
+  if (requestTimestamps.length >= LOCAL_RATE_LIMIT) {
     const oldest = requestTimestamps[0];
-    const wait = WINDOW_MS - (now - oldest) + 100;
-    await new Promise((r) => setTimeout(r, wait));
+    const wait = WINDOW_MS - (now - oldest) + 200;
+    console.log(`[trustmrr] Local rate limit (${LOCAL_RATE_LIMIT}/min), waiting ${Math.round(wait / 1000)}s`);
+    await sleep(wait);
     requestTimestamps = requestTimestamps.filter((t) => Date.now() - t < WINDOW_MS);
   }
 
@@ -45,15 +68,21 @@ function readRateLimitHeaders(res: Response): void {
   const reset = res.headers.get("x-ratelimit-reset");
   const retryAfter = res.headers.get("retry-after");
 
-  if (remaining === "0" && reset) {
-    // reset is typically a unix timestamp (seconds)
-    serverResetAt = parseInt(reset, 10) * 1000;
+  if (remaining !== null) {
+    const rem = parseInt(remaining, 10);
+    if (rem <= 1 && reset) {
+      const resetAt = parseResetTimestamp(reset);
+      if (resetAt && resetAt > Date.now()) {
+        pauseUntil = resetAt;
+        console.log(`[trustmrr] ${rem} requests remaining, will pause until reset (${Math.round((resetAt - Date.now()) / 1000)}s)`);
+      }
+    }
   }
 
   if (retryAfter) {
-    const seconds = parseInt(retryAfter, 10);
-    if (!isNaN(seconds)) {
-      serverResetAt = Date.now() + seconds * 1000;
+    const resetAt = parseResetTimestamp(retryAfter);
+    if (resetAt && resetAt > Date.now()) {
+      pauseUntil = resetAt;
     }
   }
 }
@@ -62,24 +91,32 @@ function readRateLimitHeaders(res: Response): void {
 // API helpers
 // ---------------------------------------------------------------------------
 
-function headers(): HeadersInit {
+function authHeaders(): HeadersInit {
   return { Authorization: `Bearer ${process.env.TRUSTMRR_API_KEY}` };
 }
 
-async function apiFetch(url: string): Promise<Response> {
+async function apiFetch(url: string, attempt = 0): Promise<Response> {
   await waitForSlot();
 
-  const res = await fetch(url, { headers: headers() });
+  const res = await fetch(url, { headers: authHeaders() });
   readRateLimitHeaders(res);
 
   if (res.status === 429) {
-    // Rate limited — wait and retry once
+    if (attempt >= MAX_RETRIES) {
+      throw new Error(`TrustMRR rate limited after ${MAX_RETRIES} retries — ${url}`);
+    }
+
     const retryAfter = res.headers.get("retry-after");
-    const wait = retryAfter ? parseInt(retryAfter, 10) * 1000 : 60_000;
-    console.log(`[trustmrr] Rate limited, waiting ${wait}ms`);
-    await new Promise((r) => setTimeout(r, wait));
+    let wait = 60_000; // default 60s
+    if (retryAfter) {
+      const resetAt = parseResetTimestamp(retryAfter);
+      if (resetAt) wait = Math.max(resetAt - Date.now(), 1000);
+    }
+
+    console.log(`[trustmrr] 429 rate limited (attempt ${attempt + 1}/${MAX_RETRIES}), waiting ${Math.round(wait / 1000)}s`);
+    await sleep(wait);
     requestTimestamps = [];
-    return apiFetch(url);
+    return apiFetch(url, attempt + 1);
   }
 
   if (!res.ok) {
@@ -159,6 +196,7 @@ export async function fetchAllSlugs(): Promise<TrustMRRListItem[]> {
   while (hasMore) {
     const res = await listStartups({ page, limit: 50, sort: "revenue-desc" });
     all.push(...res.data);
+    console.log(`[trustmrr] fetchAllSlugs page ${page}: +${res.data.length} (total: ${all.length}/${res.meta.total})`);
     hasMore = res.meta.hasMore;
     page++;
   }

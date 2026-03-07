@@ -10,7 +10,6 @@
 export {
   listStartups,
   getStartupDetail,
-  fetchAllSlugs,
   type TrustMRRListItem,
   type TrustMRRDetail,
   type TrustMRRListResponse,
@@ -22,4 +21,7 @@ export {
   storeMrrHistory,
   logSync,
   updateSyncLog,
+  updateProgress,
+  isCancelled,
+  getOrCreateLogId,
 } from "./sync";

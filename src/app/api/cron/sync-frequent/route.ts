@@ -12,8 +12,10 @@ import {
   getStartupDetail,
   upsertStartup,
   storeSnapshot,
-  logSync,
+  getOrCreateLogId,
   updateSyncLog,
+  updateProgress,
+  isCancelled,
 } from "@/lib/trustmrr";
 import { NextResponse } from "next/server";
 
@@ -26,7 +28,7 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
-  const logId = await logSync(admin, "trustmrr_frequent_30min", "running");
+  const logId = await getOrCreateLogId(admin, request, "trustmrr_frequent_30min");
 
   try {
     console.log("[sync-frequent] Fetching recent startups...");
@@ -54,17 +56,32 @@ export async function POST(request: Request) {
     console.log(`[sync-frequent] ${toSync.length} new/stale, ${recentStartups.length - toSync.length} skipped (fresh)`);
 
     let synced = 0;
+    let lines: string[] = [];
+
+    if (logId) {
+      lines = await updateProgress(admin, logId, 0, toSync.length, `${toSync.length} to sync, ${recentStartups.length - toSync.length} skipped (fresh)`, lines);
+    }
 
     for (const item of toSync) {
+      if (logId && await isCancelled(admin, logId)) {
+        console.log("[sync-frequent] Cancelled by user");
+        lines = await updateProgress(admin, logId, synced, toSync.length, "Cancelled by user", lines);
+        break;
+      }
+
       try {
         const detail = await getStartupDetail(item.slug);
         await upsertStartup(admin, detail);
         await storeSnapshot(admin, detail);
         synced++;
-        console.log(`[sync-frequent] ${synced}/${toSync.length} ${item.slug} OK`);
+        const line = `${synced}/${toSync.length} ${item.slug} OK`;
+        console.log(`[sync-frequent] ${line}`);
+        if (logId) lines = await updateProgress(admin, logId, synced, toSync.length, line, lines);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[sync-frequent] ${item.slug} FAILED: ${msg}`);
+        const line = `${item.slug} FAILED: ${msg}`;
+        console.error(`[sync-frequent] ${line}`);
+        if (logId) lines = await updateProgress(admin, logId, synced, toSync.length, line, lines);
       }
     }
 
