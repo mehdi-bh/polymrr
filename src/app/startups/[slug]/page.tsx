@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { MarketCard } from "@/components/market/market-card";
+import { OddsBar } from "@/components/market/odds-bar";
 import { MrrChart } from "@/components/startup/mrr-chart";
 import { FounderCard } from "@/components/startup/founder-card";
 import {
@@ -145,16 +146,10 @@ export default async function StartupPage({ params }: PageProps) {
       {/* Sentiment */}
       <div className="card bg-base-100 border border-base-300">
         <div className="card-body p-5">
-          <div className="mb-3 flex items-center justify-between text-sm">
+          <div className="mb-3">
             <span className="text-xs font-bold uppercase tracking-wider text-base-content/50">Community Sentiment</span>
-            <span className={`mono-num text-lg font-bold ${sentiment >= 50 ? "text-yes" : "text-no"}`}>
-              {sentiment}% bullish
-            </span>
           </div>
-          <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-base-300">
-            <div className="rounded-full bg-yes transition-all duration-700" style={{ width: `${sentiment}%` }} />
-            <div className="rounded-full bg-no transition-all duration-700" style={{ width: `${100 - sentiment}%` }} />
-          </div>
+          <OddsBar yesOdds={sentiment} labels={{ yes: "BULLISH", no: "BEARISH" }} />
         </div>
       </div>
 
