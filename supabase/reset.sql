@@ -277,7 +277,12 @@ from (
       count(case when m.resolved_outcome = b.side then 1 end)::numeric
       / nullif(count(case when m.status = 'resolved' then 1 end), 0) * 100
     ), 0)::integer as win_rate,
-    coalesce(sum(case when m.resolved_outcome = b.side then b.amount else 0 end), 0)::integer as credits_won,
+    -- credits_won = actual payouts received (from credit_transactions)
+    coalesce((
+      select sum(ct.amount) from credit_transactions ct
+      where ct.user_id = p.id and ct.reason = 'bet_won'
+    ), 0)::integer as credits_won,
+    -- credits_lost = sum of bet amounts on losing side
     coalesce(sum(case when m.status = 'resolved' and m.resolved_outcome != b.side then b.amount else 0 end), 0)::integer as credits_lost,
     0::integer as current_streak
   from profiles p
