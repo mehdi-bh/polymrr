@@ -59,6 +59,8 @@ export function mapMarket(row: any): Market {
     type: row.type,
     question: row.question,
     resolutionCriteria: row.resolution_criteria,
+    resolutionConfig: row.resolution_config ?? null,
+    createdBy: row.created_by ?? null,
     status: row.status,
     yesOdds: row.yes_odds,
     yesShares: row.yes_shares ?? 0,

@@ -1,23 +1,40 @@
 -- ============================================================================
--- PolyMRR seed data
--- Run this AFTER schema + LMSR migrations and AFTER you've signed in once.
--- Replace YOUR_USER_ID below with your actual profile id from the profiles table.
+-- PolyMRR seed data — realistic with actual bets via place_bet RPC
+-- Run AFTER reset.sql. Creates fake auth users + profiles, startups, markets,
+-- and places real bets so LMSR state, pools, and odds are all consistent.
 -- ============================================================================
 
--- Step 0: Clean slate
-truncate credit_transactions cascade;
+-- Step 0: Clean slate (profiles preserved from real auth, fake ones inserted below)
+truncate credit_transactions;
 truncate bets cascade;
 truncate markets cascade;
-truncate mrr_history cascade;
-truncate startup_tech_stack cascade;
-truncate startup_cofounders cascade;
+truncate sync_log;
+truncate startup_snapshots;
+truncate mrr_history;
+truncate startup_tech_stack;
+truncate startup_cofounders;
 truncate startups cascade;
--- Note: profiles are NOT truncated (tied to auth.users)
 
--- Step 1: Set your user id here (run: select id from profiles limit 1;)
-do $$ begin raise notice 'Make sure to replace YOUR_USER_ID with your real profile UUID'; end $$;
+-- Step 1: Fake auth users + profiles for seed bettors
+-- We insert directly into auth.users with minimal fields, then profiles.
+-- The trigger will auto-create profiles, but we override credits after.
+insert into auth.users (id, email, raw_user_meta_data, created_at, updated_at, instance_id, aud, role)
+values
+  ('b0000000-0000-0000-0000-000000000001', 'alice@seed.local',   '{"full_name":"Alice Chen"}',     now(), now(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
+  ('b0000000-0000-0000-0000-000000000002', 'bob@seed.local',     '{"full_name":"Bob Martinez"}',   now(), now(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
+  ('b0000000-0000-0000-0000-000000000003', 'charlie@seed.local', '{"full_name":"Charlie Park"}',   now(), now(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
+  ('b0000000-0000-0000-0000-000000000004', 'diana@seed.local',   '{"full_name":"Diana Kovacs"}',   now(), now(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
+  ('b0000000-0000-0000-0000-000000000005', 'evan@seed.local',    '{"full_name":"Evan Brooks"}',    now(), now(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated')
+on conflict (id) do nothing;
 
--- Startups
+-- Override profiles with x_handles and enough credits for betting
+update profiles set x_handle = 'alice_builds',   x_name = 'Alice Chen',    credits = 50000 where id = 'b0000000-0000-0000-0000-000000000001';
+update profiles set x_handle = 'bob_ships',       x_name = 'Bob Martinez',  credits = 50000 where id = 'b0000000-0000-0000-0000-000000000002';
+update profiles set x_handle = 'charlie_codes',   x_name = 'Charlie Park',  credits = 50000 where id = 'b0000000-0000-0000-0000-000000000003';
+update profiles set x_handle = 'diana_invests',   x_name = 'Diana Kovacs',  credits = 50000 where id = 'b0000000-0000-0000-0000-000000000004';
+update profiles set x_handle = 'evan_bets',       x_name = 'Evan Brooks',   credits = 50000 where id = 'b0000000-0000-0000-0000-000000000005';
+
+-- Step 2: Startups
 insert into startups (slug, name, description, website, country, founded_date, category, payment_provider, target_audience, revenue_last_30_days, revenue_mrr, revenue_total, customers, active_subscriptions, growth_30d, on_sale, asking_price, multiple, x_handle, x_follower_count) values
   ('shipfast',    'ShipFast',    'Ship your startup in days, not weeks. Next.js boilerplate.',          'https://shipfa.st',       'FR', '2023-06-01', 'developer-tools', 'stripe',       'b2b',  4500000, 4500000, 82000000,  3200, 1100, 0.18,  false, null,      null, 'marc_louvion', 42000),
   ('podsqueeze',  'PodSqueeze',  'AI-powered podcast repurposing tool.',                                'https://podsqueeze.com',  'IT', '2023-03-15', 'ai',              'stripe',       'b2c',  1200000, 1200000, 18000000,   850,  620, 0.12,  false, null,      null, 'tdifrancesco', 15000),
@@ -57,7 +74,7 @@ insert into startup_tech_stack (startup_slug, slug, category) values
   ('chatbase',    'openai',     'ai'),
   ('chatbase',    'stripe',     'payment');
 
--- MRR history (6 months per startup, monthly snapshots)
+-- MRR history (6 months per startup)
 insert into mrr_history (startup_slug, date, mrr) values
   ('shipfast',    '2025-10-01', 2800000), ('shipfast',    '2025-11-01', 3100000), ('shipfast',    '2025-12-01', 3400000), ('shipfast',    '2026-01-01', 3800000), ('shipfast',    '2026-02-01', 4100000), ('shipfast',    '2026-03-01', 4500000),
   ('podsqueeze',  '2025-10-01',  700000), ('podsqueeze',  '2025-11-01',  800000), ('podsqueeze',  '2025-12-01',  900000), ('podsqueeze',  '2026-01-01', 1000000), ('podsqueeze',  '2026-02-01', 1100000), ('podsqueeze',  '2026-03-01', 1200000),
@@ -70,33 +87,73 @@ insert into mrr_history (startup_slug, date, mrr) values
   ('chatbase',    '2025-10-01', 5000000), ('chatbase',    '2025-11-01', 5500000), ('chatbase',    '2025-12-01', 6200000), ('chatbase',    '2026-01-01', 6800000), ('chatbase',    '2026-02-01', 7400000), ('chatbase',    '2026-03-01', 8000000),
   ('analyzee',    '2025-10-01',   10000), ('analyzee',    '2025-11-01',   18000), ('analyzee',    '2025-12-01',   30000), ('analyzee',    '2026-01-01',   45000), ('analyzee',    '2026-02-01',   60000), ('analyzee',    '2026-03-01',   80000);
 
--- Markets with LMSR state
--- All markets start fresh: pool=0, bettors=0, odds at 50/50
--- Initial odds are set by the LMSR starting state (yes_shares=0, no_shares=0 → 50%)
--- A market maker account should place initial bets to set desired starting odds
--- b = 500 (liquidity_param) for all markets
-insert into markets (id, startup_slug, type, question, resolution_criteria, status, yes_odds, yes_shares, no_shares, liquidity_param, total_credits, total_bettors, created_at, closes_at, resolved_at, resolved_outcome) values
-  ('a0000000-0000-0000-0000-000000000001', 'shipfast',     'mrr-target',  'Will ShipFast hit $50k MRR by June 2026?',              'TrustMRR verified MRR >= $50,000 on June 30.',          'open',     50, 0, 0, 500, 0, 0, '2026-01-15', '2026-06-30', null, null),
-  ('a0000000-0000-0000-0000-000000000002', 'chatbase',     'mrr-target',  'Will Chatbase hit $100k MRR by April 2026?',             'TrustMRR verified MRR >= $100,000 on April 30.',        'open',     50, 0, 0, 500, 0, 0, '2026-01-01', '2026-04-30', null, null),
-  ('a0000000-0000-0000-0000-000000000003', 'pulsetic',     'acquisition', 'Will Pulsetic be acquired before July 2026?',            'Public announcement of completed acquisition.',          'open',     50, 0, 0, 500, 0, 0, '2026-02-01', '2026-07-01', null, null),
-  ('a0000000-0000-0000-0000-000000000004', 'typingmind',   'growth-race', 'Will TypingMind grow faster than Chatbase this quarter?', 'Compare Q1 2026 growth rates via TrustMRR.',            'open',     50, 0, 0, 500, 0, 0, '2026-01-01', '2026-04-01', null, null),
-  ('a0000000-0000-0000-0000-000000000005', 'draftql',      'survival',    'Will DraftQL still be active in December 2026?',         'TrustMRR shows revenue > $0 in Dec 2026.',              'open',     50, 0, 0, 500, 0, 0, '2026-02-15', '2026-12-31', null, null),
-  ('a0000000-0000-0000-0000-000000000006', 'podsqueeze',   'mrr-target',  'Will PodSqueeze hit $15k MRR by May 2026?',              'TrustMRR verified MRR >= $15,000 on May 31.',           'open',     50, 0, 0, 500, 0, 0, '2026-01-20', '2026-05-31', null, null),
-  ('a0000000-0000-0000-0000-000000000007', 'screenshotai', 'mrr-target',  'Will ScreenshotAI hit $5k MRR by August 2026?',          'TrustMRR verified MRR >= $5,000 on Aug 31.',            'open',     50, 0, 0, 500, 0, 0, '2026-02-01', '2026-08-31', null, null),
-  ('a0000000-0000-0000-0000-000000000008', 'analyzee',     'growth-race', 'Will Analyzee 10x its MRR by end of 2026?',              'TrustMRR verified MRR >= $8,000 on Dec 31.',            'open',     50, 0, 0, 500, 0, 0, '2026-03-01', '2026-12-31', null, null),
-  ('a0000000-0000-0000-0000-000000000009', 'notionforms',  'mrr-target',  'Will NotionForms hit $10k MRR by Q3 2026?',              'TrustMRR verified MRR >= $10,000 on Sep 30.',           'open',     50, 0, 0, 500, 0, 0, '2026-01-10', '2026-09-30', null, null),
-  ('a0000000-0000-0000-0000-000000000010', 'churnkey',     'mrr-target',  'Will Churnkey hit $35k MRR by May 2026?',                'TrustMRR verified MRR >= $35,000 on May 31.',           'open',     50, 0, 0, 500, 0, 0, '2026-01-05', '2026-05-31', null, null),
-  -- 2 resolved markets for history (these keep non-zero pools since they represent completed markets)
-  ('a0000000-0000-0000-0000-000000000011', 'shipfast',     'mrr-target',  'Did ShipFast hit $40k MRR by Jan 2026?',                 'TrustMRR verified MRR >= $40,000 on Jan 31.',           'resolved', 80, 693.1, 0, 500, 25000, 60, '2025-07-01', '2026-01-31', '2026-02-01', 'yes'),
-  ('a0000000-0000-0000-0000-000000000012', 'chatbase',     'mrr-target',  'Did Chatbase hit $90k MRR by Dec 2025?',                 'TrustMRR verified MRR >= $90,000 on Dec 31.',           'resolved', 65, 309.5, 0, 500, 20000, 48, '2025-06-01', '2025-12-31', '2026-01-02', 'no');
+-- Step 3: Markets (all start at 50/50, pool=0, bettors=0 — bets below will update these)
+insert into markets (id, startup_slug, type, question, resolution_criteria, resolution_config, created_by, status, yes_odds, yes_shares, no_shares, liquidity_param, total_credits, total_bettors, created_at, closes_at, resolved_at, resolved_outcome) values
+  ('a0000000-0000-0000-0000-000000000001', 'shipfast',     'mrr-target',  'Will ShipFast reach $50k MRR?',            'Resolves YES if ShipFast''s MRR reach or exceed $50k by close date. Data from TrustMRR.',         '{"metric":"mrr","condition":"gte","target":5000000,"dbColumn":"revenue_mrr"}',   null, 'open', 50, 0, 0, 500, 0, 0, '2026-01-15', '2026-06-30', null, null),
+  ('a0000000-0000-0000-0000-000000000002', 'chatbase',     'mrr-target',  'Will Chatbase reach $100k MRR?',           'Resolves YES if Chatbase''s MRR reach or exceed $100k by close date. Data from TrustMRR.',        '{"metric":"mrr","condition":"gte","target":10000000,"dbColumn":"revenue_mrr"}',  null, 'open', 50, 0, 0, 500, 0, 0, '2026-01-01', '2026-04-30', null, null),
+  ('a0000000-0000-0000-0000-000000000003', 'pulsetic',     'acquisition', 'Will Pulsetic be listed for sale?',        'Resolves YES if Pulsetic''s Listed for Sale be yes by close date. Data from TrustMRR.',           '{"metric":"on_sale","condition":"eq","target":1,"dbColumn":"on_sale"}',          null, 'open', 50, 0, 0, 500, 0, 0, '2026-02-01', '2026-07-01', null, null),
+  ('a0000000-0000-0000-0000-000000000004', 'typingmind',   'growth-race', 'Will TypingMind reach 20% 30d Growth?',    'Resolves YES if TypingMind''s 30d Growth reach or exceed 20% by close date. Data from TrustMRR.', '{"metric":"growth_30d","condition":"gte","target":0.2,"dbColumn":"growth_30d"}', null, 'open', 50, 0, 0, 500, 0, 0, '2026-01-01', '2026-04-01', null, null),
+  ('a0000000-0000-0000-0000-000000000005', 'draftql',      'survival',    'Will DraftQL maintain above $1.2k MRR?',   'Resolves YES if DraftQL''s MRR reach or exceed $1.2k by close date. Data from TrustMRR.',         '{"metric":"mrr","condition":"gte","target":120000,"dbColumn":"revenue_mrr"}',    null, 'open', 50, 0, 0, 500, 0, 0, '2026-02-15', '2026-12-31', null, null),
+  ('a0000000-0000-0000-0000-000000000006', 'podsqueeze',   'mrr-target',  'Will PodSqueeze reach $15k MRR?',          'Resolves YES if PodSqueeze''s MRR reach or exceed $15k by close date. Data from TrustMRR.',       '{"metric":"mrr","condition":"gte","target":1500000,"dbColumn":"revenue_mrr"}',   null, 'open', 50, 0, 0, 500, 0, 0, '2026-01-20', '2026-05-31', null, null),
+  ('a0000000-0000-0000-0000-000000000007', 'screenshotai', 'mrr-target',  'Will ScreenshotAI reach $5k MRR?',         'Resolves YES if ScreenshotAI''s MRR reach or exceed $5k by close date. Data from TrustMRR.',      '{"metric":"mrr","condition":"gte","target":500000,"dbColumn":"revenue_mrr"}',    null, 'open', 50, 0, 0, 500, 0, 0, '2026-02-01', '2026-08-31', null, null),
+  ('a0000000-0000-0000-0000-000000000008', 'analyzee',     'growth-race', 'Will Analyzee reach $8k MRR?',             'Resolves YES if Analyzee''s MRR reach or exceed $8k by close date. Data from TrustMRR.',          '{"metric":"mrr","condition":"gte","target":800000,"dbColumn":"revenue_mrr"}',    null, 'open', 50, 0, 0, 500, 0, 0, '2026-03-01', '2026-12-31', null, null),
+  ('a0000000-0000-0000-0000-000000000009', 'notionforms',  'mrr-target',  'Will NotionForms reach $10k MRR?',         'Resolves YES if NotionForms''s MRR reach or exceed $10k by close date. Data from TrustMRR.',      '{"metric":"mrr","condition":"gte","target":1000000,"dbColumn":"revenue_mrr"}',   null, 'open', 50, 0, 0, 500, 0, 0, '2026-01-10', '2026-09-30', null, null),
+  ('a0000000-0000-0000-0000-000000000010', 'churnkey',     'mrr-target',  'Will Churnkey reach $35k MRR?',            'Resolves YES if Churnkey''s MRR reach or exceed $35k by close date. Data from TrustMRR.',         '{"metric":"mrr","condition":"gte","target":3500000,"dbColumn":"revenue_mrr"}',   null, 'open', 50, 0, 0, 500, 0, 0, '2026-01-05', '2026-05-31', null, null);
 
--- Bets (reference your real user -- replace the UUID below)
--- Uncomment and replace YOUR_USER_ID with your actual profile id:
---
--- insert into bets (market_id, user_id, side, amount, shares, odds_at_time, created_at) values
---   ('a0000000-0000-0000-0000-000000000001', 'YOUR_USER_ID', 'yes', 200, 180.5, 70, '2026-02-10 14:30:00+00'),
---   ('a0000000-0000-0000-0000-000000000002', 'YOUR_USER_ID', 'yes', 500, 420.3, 82, '2026-02-12 09:15:00+00'),
---   ('a0000000-0000-0000-0000-000000000003', 'YOUR_USER_ID', 'no',  150, 185.2, 40, '2026-02-20 16:45:00+00'),
---   ('a0000000-0000-0000-0000-000000000004', 'YOUR_USER_ID', 'yes', 300, 285.7, 48, '2026-02-25 11:00:00+00'),
---   ('a0000000-0000-0000-0000-000000000011', 'YOUR_USER_ID', 'yes', 400, 320.1, 75, '2025-10-15 13:00:00+00'),
---   ('a0000000-0000-0000-0000-000000000012', 'YOUR_USER_ID', 'yes', 250, 220.6, 60, '2025-09-20 10:30:00+00');
+-- Step 4: Place real bets via place_bet RPC
+-- Each call atomically: deducts credits, inserts bet row, updates LMSR state + odds + pool + bettors.
+-- Spread across 5 users with varied sides and amounts to create realistic odds.
+
+-- Market 1: ShipFast $50k MRR — bullish consensus (70-75% YES)
+select place_bet('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'yes', 800);
+select place_bet('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'yes', 500);
+select place_bet('b0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 'yes', 300);
+select place_bet('b0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000001', 'no',  200);
+select place_bet('b0000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000001', 'yes', 400);
+
+-- Market 2: Chatbase $100k MRR — split opinion (55-60% YES)
+select place_bet('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 'yes', 600);
+select place_bet('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 'no',  500);
+select place_bet('b0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000002', 'yes', 300);
+select place_bet('b0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000002', 'no',  400);
+
+-- Market 3: Pulsetic acquisition — bearish (40% YES)
+select place_bet('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000003', 'no',  700);
+select place_bet('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000003', 'yes', 300);
+select place_bet('b0000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000003', 'no',  500);
+
+-- Market 4: TypingMind growth — skeptical (35% YES)
+select place_bet('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000004', 'no',  600);
+select place_bet('b0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000004', 'no',  400);
+select place_bet('b0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000004', 'yes', 200);
+
+-- Market 5: DraftQL survival — optimistic (65% YES)
+select place_bet('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000005', 'yes', 500);
+select place_bet('b0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000005', 'yes', 300);
+select place_bet('b0000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000005', 'no',  200);
+
+-- Market 6: PodSqueeze $15k MRR — moderate bullish (60% YES)
+select place_bet('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000006', 'yes', 400);
+select place_bet('b0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000006', 'no',  250);
+select place_bet('b0000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000006', 'yes', 150);
+
+-- Market 7: ScreenshotAI $5k MRR — strong bullish (72% YES)
+select place_bet('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000007', 'yes', 600);
+select place_bet('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000007', 'yes', 400);
+select place_bet('b0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000007', 'no',  150);
+
+-- Market 8: Analyzee $8k MRR — high conviction bullish (78% YES)
+select place_bet('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000008', 'yes', 800);
+select place_bet('b0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000008', 'yes', 500);
+select place_bet('b0000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000008', 'no',  200);
+
+-- Market 9: NotionForms $10k MRR — moderate (55% YES)
+select place_bet('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000009', 'yes', 300);
+select place_bet('b0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000009', 'no',  250);
+select place_bet('b0000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000009', 'yes', 100);
+
+-- Market 10: Churnkey $35k MRR — bullish (68% YES)
+select place_bet('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000010', 'yes', 700);
+select place_bet('b0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000010', 'yes', 300);
+select place_bet('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000010', 'no',  250);
+select place_bet('b0000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000010', 'no',  150);

@@ -99,6 +99,8 @@ export interface Market {
   type: MarketType;
   question: string;
   resolutionCriteria: string;
+  resolutionConfig: ResolutionConfig | null;
+  createdBy: string | null;
   status: MarketStatus;
   yesOdds: number; // 0-100
   yesShares: number;
@@ -110,6 +112,13 @@ export interface Market {
   closesAt: string;
   resolvedAt: string | null;
   resolvedOutcome: "yes" | "no" | null;
+}
+
+export interface ResolutionConfig {
+  metric: string;
+  condition: string;
+  target: number;
+  dbColumn: string;
 }
 
 export interface Bet {

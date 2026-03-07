@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { RAKE_PERCENT } from "@/lib/lmsr";
+import { resolveMarket } from "@/lib/market-templates";
 
 function verifyCron(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -56,6 +57,20 @@ export async function POST(request: Request) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function determineOutcome(market: any): "yes" | "no" | null {
+  const startup = market.startups;
+  if (!startup) return null;
+
+  // Structured resolution via resolution_config (new markets)
+  if (market.resolution_config) {
+    return resolveMarket(market.resolution_config, startup);
+  }
+
+  // Legacy fallback for old markets without resolution_config
+  return determineLegacyOutcome(market);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function determineLegacyOutcome(market: any): "yes" | "no" | null {
   const startup = market.startups;
   if (!startup) return null;
 
