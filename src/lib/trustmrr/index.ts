@@ -16,6 +16,7 @@ export {
 } from "./client";
 
 export {
+  upsertStartupFromList,
   upsertStartup,
   storeSnapshot,
   storeMrrHistory,

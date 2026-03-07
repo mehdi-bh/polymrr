@@ -25,7 +25,8 @@ interface Stats {
 }
 
 const SCHEDULES: Record<string, string> = {
-  "sync-startups": "Daily 2:00 AM UTC",
+  "sync-daily": "Daily 2:00 AM UTC",
+  "sync-startups": "Manual only",
   "sync-frequent": "Every 30 min",
   "scrape-mrr": "Daily 3:00 AM UTC",
   "generate-markets": "Daily 4:00 AM UTC",
@@ -33,7 +34,8 @@ const SCHEDULES: Record<string, string> = {
 };
 
 const DESCRIPTIONS: Record<string, string> = {
-  "sync-startups": "Full sync of all startups from TrustMRR",
+  "sync-daily": "Lightweight daily sync — updates metrics from list API, fetches detail only for new startups",
+  "sync-startups": "Full backfill — fetches detail for every startup (slow, use for initial setup)",
   "sync-frequent": "Quick sync of recently listed startups",
   "scrape-mrr": "Scrape historical MRR data from TrustMRR pages",
   "generate-markets": "Auto-generate prediction markets from startup data",
@@ -246,6 +248,106 @@ export function CronDashboard() {
     return logs.find((l) => l.source === source);
   }
 
+  const JOB_GROUPS: { label: string; ids: string[] }[] = [
+    { label: "Data Sync", ids: ["sync-daily", "sync-frequent", "scrape-mrr"] },
+    { label: "Markets", ids: ["generate-markets", "resolve-markets"] },
+    { label: "Manual", ids: ["sync-startups"] },
+  ];
+
+  function renderJobCard(job: CronJob) {
+    const lastRun = getLastRun(job.source);
+    const isActive = job.id in activeJobs;
+
+    return (
+      <div key={job.id} className="rounded-xl border border-base-300 bg-base-100 p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="font-semibold">{job.id}</div>
+            <div className="text-xs text-base-content/50">{DESCRIPTIONS[job.id]}</div>
+            <div className="mt-1 flex items-center gap-3 text-[11px] text-base-content/50">
+              <span>{SCHEDULES[job.id]}</span>
+              <span className="font-mono">{job.path}</span>
+            </div>
+          </div>
+          {isActive ? (
+            <button
+              onClick={() => stopJob(job.id)}
+              disabled={stoppingJobs.has(job.id)}
+              className="btn btn-error btn-sm gap-1 shrink-0"
+            >
+              {stoppingJobs.has(job.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
+              {stoppingJobs.has(job.id) ? "Stopping..." : "Stop"}
+            </button>
+          ) : (
+            <button onClick={() => triggerJob(job.id)} className="btn btn-primary btn-sm gap-1 shrink-0">
+              <Play className="h-4 w-4" />
+              Run
+            </button>
+          )}
+        </div>
+
+        {isActive && (
+          <ProgressTerminal logId={activeJobs[job.id]} onDone={() => handleJobDone(job.id)} />
+        )}
+
+        {!isActive && lastRun && (
+          <div
+            className={`mt-3 flex items-center gap-3 text-xs ${lastRun.status === "running" ? "cursor-pointer hover:opacity-80" : ""}`}
+            onClick={() => {
+              if (lastRun.status === "running") {
+                setActiveJobs((prev) => ({ ...prev, [job.id]: lastRun.id }));
+              }
+            }}
+          >
+            {statusBadge(lastRun.status)}
+            <span className="text-base-content/50">{timeAgo(lastRun.created_at)}</span>
+            {lastRun.details && (
+              <span className="font-mono text-base-content/50">
+                {Object.entries(lastRun.details)
+                  .filter(([k]) => !["error", "errors", "completed_at", "lines"].includes(k))
+                  .map(([k, v]) => `${k}: ${v}`)
+                  .join(" | ")}
+              </span>
+            )}
+            {lastRun.status === "running" && (
+              <span className="text-warning text-[11px]">click to view</span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderJobGroups() {
+    return (
+      <>
+        {JOB_GROUPS.map((group) => {
+          const groupJobs = group.ids
+            .map((id) => jobs.find((j) => j.id === id))
+            .filter(Boolean) as CronJob[];
+          if (groupJobs.length === 0) return null;
+
+          return (
+            <div key={group.label} className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold">{group.label}</h2>
+                {group.label === "Data Sync" && (
+                  <button onClick={fetchData} disabled={loading} className="btn btn-ghost btn-sm gap-1">
+                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                    Refresh
+                  </button>
+                )}
+              </div>
+              <div className="space-y-2">
+                {groupJobs.map((job) => renderJobCard(job))}
+              </div>
+            </div>
+          );
+        })}
+      </>
+    );
+  }
+
   if (loading && jobs.length === 0) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-base-content/50" /></div>;
   }
@@ -271,81 +373,7 @@ export function CronDashboard() {
         </div>
       )}
 
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">Jobs</h2>
-          <button onClick={fetchData} disabled={loading} className="btn btn-ghost btn-sm gap-1">
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          {jobs.map((job) => {
-            const lastRun = getLastRun(job.source);
-            const isActive = job.id in activeJobs;
-
-            return (
-              <div key={job.id} className="rounded-xl border border-base-300 bg-base-100 p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="font-semibold">{job.id}</div>
-                    <div className="text-xs text-base-content/50">{DESCRIPTIONS[job.id]}</div>
-                    <div className="mt-1 flex items-center gap-3 text-[11px] text-base-content/50">
-                      <span>{SCHEDULES[job.id]}</span>
-                      <span className="font-mono">{job.path}</span>
-                    </div>
-                  </div>
-                  {isActive ? (
-                    <button
-                      onClick={() => stopJob(job.id)}
-                      disabled={stoppingJobs.has(job.id)}
-                      className="btn btn-error btn-sm gap-1 shrink-0"
-                    >
-                      {stoppingJobs.has(job.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
-                      {stoppingJobs.has(job.id) ? "Stopping..." : "Stop"}
-                    </button>
-                  ) : (
-                    <button onClick={() => triggerJob(job.id)} className="btn btn-primary btn-sm gap-1 shrink-0">
-                      <Play className="h-4 w-4" />
-                      Run
-                    </button>
-                  )}
-                </div>
-
-                {isActive && (
-                  <ProgressTerminal logId={activeJobs[job.id]} onDone={() => handleJobDone(job.id)} />
-                )}
-
-                {!isActive && lastRun && (
-                  <div
-                    className={`mt-3 flex items-center gap-3 text-xs ${lastRun.status === "running" ? "cursor-pointer hover:opacity-80" : ""}`}
-                    onClick={() => {
-                      if (lastRun.status === "running") {
-                        setActiveJobs((prev) => ({ ...prev, [job.id]: lastRun.id }));
-                      }
-                    }}
-                  >
-                    {statusBadge(lastRun.status)}
-                    <span className="text-base-content/50">{timeAgo(lastRun.created_at)}</span>
-                    {lastRun.details && (
-                      <span className="font-mono text-base-content/50">
-                        {Object.entries(lastRun.details)
-                          .filter(([k]) => !["error", "errors", "completed_at", "lines"].includes(k))
-                          .map(([k, v]) => `${k}: ${v}`)
-                          .join(" | ")}
-                      </span>
-                    )}
-                    {lastRun.status === "running" && (
-                      <span className="text-warning text-[11px]">click to view</span>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {renderJobGroups()}
 
       <div className="space-y-3">
         <h2 className="text-lg font-bold">Recent Logs</h2>

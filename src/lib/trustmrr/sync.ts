@@ -6,7 +6,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { TrustMRRDetail } from "./client";
+import type { TrustMRRDetail, TrustMRRListItem } from "./client";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -37,6 +37,44 @@ function normalizeCategory(raw: string | null): string | null {
   if (!raw) return null;
   const lower = raw.toLowerCase();
   return CATEGORY_MAP[lower] ?? lower.replace(/\s+/g, "-");
+}
+
+/** Upsert a startup from TrustMRR list data (no detail call needed).
+ *  Updates all revenue/metric fields. Skips detail-only fields (xFollowerCount,
+ *  techStack, cofounders, isMerchantOfRecord) — those keep their existing values.
+ *  For new startups (not in DB), those fields will be null until a full sync runs. */
+export async function upsertStartupFromList(admin: Admin, data: TrustMRRListItem) {
+  const { error } = await admin.from("startups").upsert(
+    {
+      slug: data.slug,
+      name: data.name,
+      icon: data.icon,
+      description: data.description,
+      website: data.website,
+      country: data.country,
+      founded_date: data.foundedDate,
+      category: normalizeCategory(data.category),
+      payment_provider: data.paymentProvider,
+      target_audience: data.targetAudience,
+      revenue_last_30_days: Math.round(data.revenue.last30Days),
+      revenue_mrr: Math.round(data.revenue.mrr),
+      revenue_total: Math.round(data.revenue.total),
+      customers: Math.round(data.customers),
+      active_subscriptions: Math.round(data.activeSubscriptions),
+      asking_price: int(data.askingPrice),
+      profit_margin_last_30_days: data.profitMarginLast30Days,
+      growth_30d: data.growth30d,
+      multiple: data.multiple,
+      on_sale: data.onSale,
+      first_listed_for_sale_at: data.firstListedForSaleAt,
+      x_handle: data.xHandle,
+      synced_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "slug" }
+  );
+
+  if (error) throw new Error(`Upsert startup ${data.slug}: ${error.message}`);
 }
 
 /** Upsert a startup from TrustMRR detail response into our DB */

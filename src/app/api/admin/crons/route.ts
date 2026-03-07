@@ -16,6 +16,7 @@ async function isAdmin(): Promise<boolean> {
 }
 
 const CRON_JOBS = [
+  { id: "sync-daily", path: "/api/cron/sync-daily", source: "sync_daily" },
   { id: "sync-startups", path: "/api/cron/sync-startups", source: "trustmrr_full_daily" },
   { id: "sync-frequent", path: "/api/cron/sync-frequent", source: "trustmrr_frequent_30min" },
   { id: "scrape-mrr", path: "/api/cron/scrape-mrr", source: "mrr_scrape" },
