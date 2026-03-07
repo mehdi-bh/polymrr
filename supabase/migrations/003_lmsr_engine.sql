@@ -156,7 +156,7 @@ end;
 $$ language plpgsql security definer;
 
 -- ---------------------------------------------------------------------------
--- distribute_payout: credit a user's winnings atomically
+-- distribute_payout: credit a user's winnings atomically (idempotent)
 -- ---------------------------------------------------------------------------
 create or replace function distribute_payout(
   p_user_id uuid,
@@ -165,6 +165,14 @@ create or replace function distribute_payout(
   p_market_id uuid
 ) returns void as $$
 begin
+  -- Skip if this bet was already paid out (idempotent on retry)
+  if exists (
+    select 1 from credit_transactions
+    where ref_bet_id = p_bet_id and reason = 'bet_won'
+  ) then
+    return;
+  end if;
+
   update profiles set credits = credits + p_amount where id = p_user_id;
 
   insert into credit_transactions (user_id, amount, reason, ref_bet_id, ref_market_id)

@@ -10,6 +10,8 @@ import {
   type MarketBlueprint,
 } from "@/lib/market-templates";
 
+export const maxDuration = 300;
+
 function verifyCron(request: Request) {
   const authHeader = request.headers.get("authorization");
   return authHeader === `Bearer ${process.env.CRON_SECRET}`;

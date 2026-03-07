@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { RAKE_PERCENT } from "@/lib/lmsr";
 import { resolveMarket } from "@/lib/market-templates";
 
+export const maxDuration = 300;
+
 function verifyCron(request: Request) {
   const authHeader = request.headers.get("authorization");
   return authHeader === `Bearer ${process.env.CRON_SECRET}`;
@@ -31,27 +33,38 @@ export async function POST(request: Request) {
     .is("resolved_outcome", null);
 
   let resolved = 0;
+  const errors: string[] = [];
 
   for (const market of pendingMarkets ?? []) {
-    const outcome = determineOutcome(market);
-    if (outcome === null) continue;
+    try {
+      const outcome = determineOutcome(market);
+      if (outcome === null) continue;
 
-    await admin
-      .from("markets")
-      .update({
-        status: "resolved",
-        resolved_outcome: outcome,
-        resolved_at: new Date().toISOString(),
-      })
-      .eq("id", market.id);
+      // Distribute payouts BEFORE marking as resolved to avoid
+      // partial state where market is "resolved" but payouts missing
+      await distributePayouts(admin, market.id, outcome, market.total_credits);
 
-    await distributePayouts(admin, market.id, outcome, market.total_credits);
-    resolved++;
+      await admin
+        .from("markets")
+        .update({
+          status: "resolved",
+          resolved_outcome: outcome,
+          resolved_at: new Date().toISOString(),
+        })
+        .eq("id", market.id);
+
+      resolved++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[resolve-markets] ${market.id} FAILED: ${msg}`);
+      errors.push(`${market.id}: ${msg}`);
+    }
   }
 
   return NextResponse.json({
     closed: closedMarkets?.length ?? 0,
     resolved,
+    errors: errors.length > 0 ? errors : undefined,
   });
 }
 

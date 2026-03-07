@@ -87,7 +87,18 @@ export async function POST(request: Request) {
 
     console.log(`[scrape-mrr] Done: ${succeeded}/${toScrape.length}`);
 
-    if (logId) await updateSyncLog(admin, logId, "completed", summary);
+    if (logId) await updateSyncLog(admin, logId, summary.pending > 0 ? "partial" : "completed", summary);
+
+    // Self-re-invoke if there's remaining work
+    if (summary.pending > 0) {
+      const baseUrl = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000";
+      fetch(`${baseUrl}/api/cron/scrape-mrr`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
+      }).catch(() => {}); // fire-and-forget
+    }
 
     return NextResponse.json({ ok: true, ...summary });
   } catch (err) {
