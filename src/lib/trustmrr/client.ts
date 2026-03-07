@@ -101,21 +101,22 @@ async function apiFetch(url: string, attempt = 0): Promise<Response> {
   const res = await fetch(url, { headers: authHeaders() });
   readRateLimitHeaders(res);
 
-  if (res.status === 429) {
+  // Retryable errors: 429, 508, 502, 503, 504
+  if (res.status === 429 || res.status === 508 || res.status === 502 || res.status === 503 || res.status === 504) {
     if (attempt >= MAX_RETRIES) {
-      throw new Error(`TrustMRR rate limited after ${MAX_RETRIES} retries — ${url}`);
+      throw new Error(`TrustMRR API ${res.status} after ${MAX_RETRIES} retries — ${url}`);
     }
 
+    let wait = res.status === 429 ? 60_000 : 10_000;
     const retryAfter = res.headers.get("retry-after");
-    let wait = 60_000; // default 60s
     if (retryAfter) {
       const resetAt = parseResetTimestamp(retryAfter);
       if (resetAt) wait = Math.max(resetAt - Date.now(), 1000);
     }
 
-    console.log(`[trustmrr] 429 rate limited (attempt ${attempt + 1}/${MAX_RETRIES}), waiting ${Math.round(wait / 1000)}s`);
+    console.log(`[trustmrr] ${res.status} ${res.statusText} (attempt ${attempt + 1}/${MAX_RETRIES}), waiting ${Math.round(wait / 1000)}s`);
     await sleep(wait);
-    requestTimestamps = [];
+    if (res.status === 429) requestTimestamps = [];
     return apiFetch(url, attempt + 1);
   }
 

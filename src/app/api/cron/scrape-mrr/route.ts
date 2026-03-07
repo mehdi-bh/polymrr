@@ -16,7 +16,10 @@ export const maxDuration = 300;
 const MAX_PER_RUN = 50;
 const DELAY_MS = 1500;
 
-export async function POST(request: Request) {
+export async function GET(request: Request) { return handler(request); }
+export async function POST(request: Request) { return handler(request); }
+
+async function handler(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

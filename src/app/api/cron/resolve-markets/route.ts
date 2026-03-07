@@ -10,7 +10,10 @@ function verifyCron(request: Request) {
   return authHeader === `Bearer ${process.env.CRON_SECRET}`;
 }
 
-export async function POST(request: Request) {
+export async function GET(request: Request) { return handler(request); }
+export async function POST(request: Request) { return handler(request); }
+
+async function handler(request: Request) {
   if (!verifyCron(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
