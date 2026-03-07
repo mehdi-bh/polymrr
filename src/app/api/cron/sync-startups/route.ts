@@ -85,7 +85,7 @@ export async function POST(request: Request) {
           await storeSnapshot(admin, detail);
           synced++;
           if (logId) {
-            const line = synced % 5 === 0 ? `${synced}/${total} ${item.slug} OK` : null;
+            const line = `${synced}/${total} ${item.slug} OK`;
             lines = await updateProgress(admin, logId, synced, total, line, lines);
           }
         } catch (err) {
