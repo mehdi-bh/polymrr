@@ -1,10 +1,10 @@
 name: Sync Crons
 
 on:
-  schedule:
-    - cron: "*/30 * * * *" # sync-frequent
-    - cron: "0 2 * * *"    # sync-daily
-    - cron: "0 3 * * *"    # scrape-mrr
+  # schedule:
+  #   - cron: "*/30 * * * *" # sync-frequent
+  #   - cron: "0 2 * * *"    # sync-daily
+  #   - cron: "0 3 * * *"    # scrape-mrr
   workflow_dispatch:
     inputs:
       job:
