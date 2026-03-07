@@ -1,0 +1,76 @@
+name: Sync Crons
+
+on:
+  schedule:
+    - cron: "*/30 * * * *" # sync-frequent
+    - cron: "0 2 * * *"    # sync-daily
+    - cron: "0 3 * * *"    # scrape-mrr
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Job to run"
+        required: true
+        type: choice
+        options:
+          - sync-daily
+          - sync-frequent
+          - scrape-mrr
+          - sync-startups
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+  SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+  TRUSTMRR_API_KEY: ${{ secrets.TRUSTMRR_API_KEY }}
+
+jobs:
+  sync-frequent:
+    if: github.event.schedule == '*/30 * * * *' || (github.event_name == 'workflow_dispatch' && inputs.job == 'sync-frequent')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/sync-frequent.ts
+
+  sync-daily:
+    if: github.event.schedule == '0 2 * * *' || (github.event_name == 'workflow_dispatch' && inputs.job == 'sync-daily')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/sync-daily.ts
+
+  scrape-mrr:
+    if: github.event.schedule == '0 3 * * *' || (github.event_name == 'workflow_dispatch' && inputs.job == 'scrape-mrr')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/scrape-mrr.ts
+
+  sync-startups:
+    if: github.event_name == 'workflow_dispatch' && inputs.job == 'sync-startups'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/sync-startups.ts
