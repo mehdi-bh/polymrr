@@ -1,24 +1,2 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/resolve-markets",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/sync-daily",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/sync-frequent",
-      "schedule": "*/30 * * * *"
-    },
-    {
-      "path": "/api/cron/scrape-mrr",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/generate-markets",
-      "schedule": "0 4 * * *"
-    }
-  ]
 }
