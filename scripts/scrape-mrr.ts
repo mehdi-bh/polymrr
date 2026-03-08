@@ -31,6 +31,7 @@ async function main() {
     const toScrape = [...neverScraped, ...stale];
 
     let succeeded = 0;
+    let noData = 0;
     let processed = 0;
     let consecutiveFailures = 0;
     const errors: string[] = [];
@@ -50,7 +51,8 @@ async function main() {
           consecutiveFailures = 0;
           if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, `${processed}/${toScrape.length} ${slug}: ${points.length} months`, lines);
         } else {
-          consecutiveFailures++;
+          noData++;
+          consecutiveFailures = 0;
           if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, `${processed}/${toScrape.length} ${slug}: no data`, lines);
         }
       } catch (err) {
@@ -70,12 +72,14 @@ async function main() {
       }
     }
 
-    console.log(`[scrape-mrr] Done: ${succeeded}/${toScrape.length}`);
+    const failed = errors.length;
+    const status = failed === 0 ? "completed" : failed < toScrape.length * 0.1 ? "completed" : "partial";
+    console.log(`[scrape-mrr] Done: ${succeeded} scraped, ${noData} no data, ${failed} failed / ${toScrape.length} total`);
 
     if (logId) {
-      await updateSyncLog(admin, logId, "completed", {
-        total: toScrape.length, succeeded,
-        errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
+      await updateSyncLog(admin, logId, status, {
+        total: toScrape.length, succeeded, no_data: noData, failed,
+        errors: errors.length > 0 ? errors.slice(0, 20) : undefined,
         completed_at: new Date().toISOString(),
       });
     }

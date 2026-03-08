@@ -72,8 +72,7 @@ async function fetchRevenueTimeline(
   });
 
   if (!res.ok) {
-    console.error(`[scraper] Revenue API ${res.status} for ${slug}`);
-    return null;
+    throw new Error(`Revenue API ${res.status}`);
   }
 
   const body: RevenueResponse = await res.json();
@@ -122,16 +121,14 @@ export async function scrapeMrrHistory(
     });
 
     if (!pageRes.ok) {
-      console.error(`[scraper] Page fetch ${pageRes.status} for ${slug}`);
-      return null;
+      throw new Error(`Page fetch ${pageRes.status}`);
     }
 
     const html = await pageRes.text();
     const apiToken = extractApiToken(html);
 
     if (!apiToken) {
-      console.warn(`[scraper] No apiToken found for ${slug}`);
-      return null;
+      return null; // legitimately no token (startup may not have revenue data)
     }
 
     const entries = await fetchRevenueTimeline(slug, apiToken);
@@ -143,7 +140,6 @@ export async function scrapeMrrHistory(
     const currentMonth = new Date().toISOString().slice(0, 7);
     return points.filter((p) => p.date.slice(0, 7) < currentMonth);
   } catch (err) {
-    console.error(`[scraper] Error for ${slug}:`, err);
-    return null;
+    throw new Error(`Scrape failed for ${slug}: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
