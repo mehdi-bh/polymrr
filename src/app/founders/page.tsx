@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { getFoundersPaginated } from "@/lib/data";
+import { getFoundersPaginated, getOpenMarkets } from "@/lib/data";
 import { FoundersFilters } from "./founders-client";
 import { FounderPageCard } from "@/components/founder/founder-page-card";
 import { Pagination } from "@/components/ui/pagination";
@@ -37,12 +37,15 @@ export default async function FoundersPage({ searchParams }: Props) {
 }
 
 async function FoundersResults({ filters, page }: { filters: { sort: string; search: string }; page: number }) {
-  const { data: founders, total } = await getFoundersPaginated({
-    sort: filters.sort,
-    search: filters.search || undefined,
-    page,
-    perPage: PER_PAGE,
-  });
+  const [{ data: founders, total }, openMarkets] = await Promise.all([
+    getFoundersPaginated({
+      sort: filters.sort,
+      search: filters.search || undefined,
+      page,
+      perPage: PER_PAGE,
+    }),
+    getOpenMarkets(),
+  ]);
 
   const totalPages = Math.ceil(total / PER_PAGE);
 
@@ -60,16 +63,23 @@ async function FoundersResults({ filters, page }: { filters: { sort: string; sea
         {totalPages > 1 && <span>Page {page} of {totalPages}</span>}
       </div>
       <div className="stagger-children grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {founders.map((f) => (
-          <FounderPageCard
-            key={f.xHandle}
-            xHandle={f.xHandle}
-            xName={f.xName}
-            startups={f.startups}
-            totalRevenue={f.totalRevenue}
-            totalFollowers={f.totalFollowers}
-          />
-        ))}
+        {founders.map((f) => {
+          const slugs = new Set(f.startups.map((s) => s.slug));
+          const mc = openMarkets.filter(
+            (m) => m.founderXHandle === f.xHandle || slugs.has(m.startupSlug)
+          ).length;
+          return (
+            <FounderPageCard
+              key={f.xHandle}
+              xHandle={f.xHandle}
+              xName={f.xName}
+              startups={f.startups}
+              totalRevenue={f.totalRevenue}
+              totalFollowers={f.totalFollowers}
+              activeMarketCount={mc}
+            />
+          );
+        })}
       </div>
       <Pagination currentPage={page} totalPages={totalPages} />
     </>

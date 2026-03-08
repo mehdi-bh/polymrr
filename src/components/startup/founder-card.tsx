@@ -81,7 +81,7 @@ export function FounderCard({ founder, xFollowerCount, allStartups, allMarkets }
 
         <div className="w-full space-y-1.5">
           {topStartups.map((s, i) => (
-            <div key={s.slug} className="flex items-center gap-2.5 rounded-lg bg-base-200/50 px-3 py-2">
+            <Link key={s.slug} href={`/startups/${s.slug}`} className="flex items-center gap-2.5 rounded-lg bg-base-200/50 px-3 py-2 transition-colors hover:bg-base-200">
               <span className={`mono-num text-[10px] font-bold shrink-0 w-3 text-center ${
                 i === 0 ? "text-warning" : i === 1 ? "text-base-content/40" : "text-base-content/25"
               }`}>
@@ -100,7 +100,7 @@ export function FounderCard({ founder, xFollowerCount, allStartups, allMarkets }
               <span className="mono-num text-[11px] text-base-content/50 shrink-0">
                 {formatCents(s.revenue.total)}
               </span>
-            </div>
+            </Link>
           ))}
         </div>
 
