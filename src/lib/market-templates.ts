@@ -131,7 +131,7 @@ function formatTarget(target: number, unit: MetricDef["unit"]): string {
     case "count":
       return target.toLocaleString();
     case "percent":
-      return `${(target * 100).toFixed(0)}%`;
+      return `${target.toFixed(1)}%`;
     case "boolean":
       return target === 1 ? "yes" : "no";
   }
@@ -239,13 +239,12 @@ export interface BetSuggestion {
   daysFromNow: number;
 }
 
-function niceRoundCents(cents: number): number {
-  const d = cents / 100;
-  if (d >= 100_000) return Math.round(d / 25_000) * 25_000 * 100;
-  if (d >= 10_000) return Math.round(d / 5_000) * 5_000 * 100;
-  if (d >= 1_000) return Math.round(d / 500) * 500 * 100;
-  if (d >= 100) return Math.round(d / 50) * 50 * 100;
-  return Math.round(d / 10) * 10 * 100;
+function niceRoundCents(v: number): number {
+  if (v >= 100_000) return Math.round(v / 25_000) * 25_000;
+  if (v >= 10_000) return Math.round(v / 5_000) * 5_000;
+  if (v >= 1_000) return Math.round(v / 500) * 500;
+  if (v >= 100) return Math.round(v / 50) * 50;
+  return Math.round(v / 10) * 10;
 }
 
 function niceRoundCount(n: number): number {
@@ -262,11 +261,11 @@ export function generateSuggestions(startup: Startup): BetSuggestion[] {
 
   // 1. Optimistic MRR target (3 months)
   if (mrr > 0) {
-    const projected = mrr * Math.pow(1 + Math.max(growth, 0.05), 3);
+    const projected = mrr * Math.pow(1 + Math.max(growth, 5) / 100, 3);
     const target = niceRoundCents(Math.round(projected * 1.15));
     suggestions.push({
       label: `Reach ${formatCents(target)} MRR`,
-      description: `Currently ${formatCents(mrr)}, ${growth >= 0 ? "+" : ""}${(growth * 100).toFixed(0)}%/mo`,
+      description: `Currently ${formatCents(mrr)}, ${growth >= 0 ? "+" : ""}${growth.toFixed(1)}%/mo`,
       metric: "mrr",
       condition: "gte",
       target,

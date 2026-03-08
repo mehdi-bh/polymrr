@@ -52,7 +52,7 @@ export function StartupCard({ startup, activeMarketCount, sentiment }: StartupCa
               <TrendingDown className="h-3.5 w-3.5 text-no" />
             )}
             <span className={`mono-num text-sm font-bold ${growthPositive ? "text-yes" : "text-no"}`}>
-              {startup.growth30d !== null ? `${(startup.growth30d * 100).toFixed(0)}%` : "N/A"}
+              {startup.growth30d !== null ? `${startup.growth30d.toFixed(1)}%` : "N/A"}
             </span>
           </div>
         </div>

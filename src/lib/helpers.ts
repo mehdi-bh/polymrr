@@ -1,7 +1,8 @@
 import type { Market } from "./types";
 
 export function formatCents(cents: number): string {
-  const dollars = cents / 100;
+  const dollars = cents;
+  if (dollars >= 1_000_000_000) return `$${(dollars / 1_000_000_000).toFixed(1)}B`;
   if (dollars >= 1_000_000) return `$${(dollars / 1_000_000).toFixed(1)}M`;
   if (dollars >= 1_000) return `$${(dollars / 1_000).toFixed(dollars >= 10_000 ? 0 : 1)}k`;
   return `$${dollars.toFixed(0)}`;

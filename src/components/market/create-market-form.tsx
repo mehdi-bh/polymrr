@@ -248,7 +248,7 @@ export function CreateMarketForm({
                       }`}
                     >
                       {selectedStartup.growth30d !== null
-                        ? `${(selectedStartup.growth30d * 100).toFixed(0)}%/mo`
+                        ? `${selectedStartup.growth30d.toFixed(1)}%/mo`
                         : "N/A"}
                     </span>
                   </span>
@@ -412,7 +412,7 @@ export function CreateMarketForm({
                 Current growth:{" "}
                 <span className="mono-num font-semibold text-base-content/70">
                   {selectedStartup.growth30d !== null
-                    ? `${(selectedStartup.growth30d * 100).toFixed(0)}%`
+                    ? `${selectedStartup.growth30d.toFixed(1)}%`
                     : "N/A"}
                 </span>
               </div>

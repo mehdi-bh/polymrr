@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { StartupCard } from "@/components/startup/startup-card";
-import type { Startup, TrustMRRCategory } from "@/lib/types";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, type ReactNode } from "react";
+import { FilterPill } from "@/components/ui/filter-pill";
+import { SearchInput } from "@/components/ui/search-input";
+import type { TrustMRRCategory } from "@/lib/types";
 
 const categoryOptions: { value: TrustMRRCategory | "all"; label: string }[] = [
   { value: "all", label: "All" },
@@ -20,87 +22,69 @@ const sortOptions = [
   { value: "mrr-desc", label: "Highest MRR" },
   { value: "growth-desc", label: "Fastest Growing" },
   { value: "newest", label: "Newest" },
+  { value: "customers-desc", label: "Most Customers" },
+  { value: "followers-desc", label: "Most Followers" },
+  { value: "alpha", label: "A-Z" },
 ] as const;
 
-function FilterPill({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`btn btn-xs ${
-        active ? "btn-primary btn-outline" : "btn-ghost"
-      }`}
-    >
-      {children}
-    </button>
+interface StartupsFiltersProps {
+  filters: { category: string; sort: string; forSale: boolean; search: string };
+  children: ReactNode;
+}
+
+export function StartupsFilters({ filters, children }: StartupsFiltersProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const updateParams = useCallback(
+    (updates: Record<string, string | undefined>) => {
+      const params = new URLSearchParams(searchParams.toString());
+      for (const [key, value] of Object.entries(updates)) {
+        if (!value || value === "all" || (key === "sort" && value === "mrr-desc") || (key === "forSale" && value === "false")) {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      }
+      const qs = params.toString();
+      router.push(qs ? `/startups?${qs}` : "/startups");
+    },
+    [router, searchParams]
   );
-}
 
-interface EnrichedStartup {
-  startup: Startup;
-  activeMarketCount: number;
-  sentiment: number;
-}
-
-interface StartupsClientProps {
-  startups: EnrichedStartup[];
-}
-
-export function StartupsClient({ startups }: StartupsClientProps) {
-  const [category, setCategory] = useState<TrustMRRCategory | "all">("all");
-  const [sort, setSort] = useState<"mrr-desc" | "growth-desc" | "newest">("mrr-desc");
-  const [forSaleOnly, setForSaleOnly] = useState(false);
-
-  const filtered = useMemo(() => {
-    let result = [...startups];
-    if (category !== "all") result = result.filter((e) => e.startup.category === category);
-    if (forSaleOnly) result = result.filter((e) => e.startup.onSale);
-    switch (sort) {
-      case "mrr-desc": result.sort((a, b) => b.startup.revenue.mrr - a.startup.revenue.mrr); break;
-      case "growth-desc": result.sort((a, b) => (b.startup.growth30d ?? 0) - (a.startup.growth30d ?? 0)); break;
-      case "newest": result.sort((a, b) => {
-        if (!a.startup.foundedDate || !b.startup.foundedDate) return 0;
-        return new Date(b.startup.foundedDate).getTime() - new Date(a.startup.foundedDate).getTime();
-      }); break;
-    }
-    return result;
-  }, [startups, category, sort, forSaleOnly]);
+  function setFilter(key: string, value: string) {
+    updateParams({ [key]: value, page: undefined });
+  }
 
   return (
     <div className="space-y-6 animate-fade-up">
       <h1 className="text-2xl font-bold">Startups</h1>
 
+      <SearchInput
+        value={filters.search}
+        placeholder="Search startups, founders, tech..."
+        onChange={(value) => updateParams({ q: value || undefined, page: undefined })}
+      />
+
       <div className="flex flex-wrap items-center gap-1.5">
         {categoryOptions.map((o) => (
-          <FilterPill key={o.value} active={category === o.value} onClick={() => setCategory(o.value)}>
+          <FilterPill key={o.value} active={filters.category === o.value} onClick={() => setFilter("category", o.value)}>
             {o.label}
           </FilterPill>
         ))}
         <div className="divider divider-horizontal mx-0" />
         {sortOptions.map((o) => (
-          <FilterPill key={o.value} active={sort === o.value} onClick={() => setSort(o.value)}>
+          <FilterPill key={o.value} active={filters.sort === o.value} onClick={() => setFilter("sort", o.value)}>
             {o.label}
           </FilterPill>
         ))}
         <div className="divider divider-horizontal mx-0" />
-        <FilterPill active={forSaleOnly} onClick={() => setForSaleOnly(!forSaleOnly)}>
+        <FilterPill active={filters.forSale} onClick={() => setFilter("forSale", filters.forSale ? "false" : "true")}>
           For Sale
         </FilterPill>
       </div>
 
-      {filtered.length > 0 ? (
-        <div className="stagger-children grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((e) => (
-            <StartupCard
-              key={e.startup.slug}
-              startup={e.startup}
-              activeMarketCount={e.activeMarketCount}
-              sentiment={e.sentiment}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="py-16 text-center text-base-content/50">No startups match your filters.</p>
-      )}
+      {children}
     </div>
   );
 }

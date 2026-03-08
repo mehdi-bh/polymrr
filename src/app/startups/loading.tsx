@@ -1,0 +1,15 @@
+import { CardGridSkeleton } from "@/components/ui/card-skeleton";
+
+export default function StartupsLoading() {
+  return (
+    <div className="space-y-6">
+      <div className="h-8 w-32 rounded bg-base-300 animate-pulse" />
+      <div className="flex flex-wrap gap-1.5">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-6 w-16 rounded-lg bg-base-300 animate-pulse" />
+        ))}
+      </div>
+      <CardGridSkeleton variant="startup" />
+    </div>
+  );
+}

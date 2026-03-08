@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { MarketCard } from "@/components/market/market-card";
-import { daysUntil } from "@/lib/helpers";
-import type { Market, Startup, MarketType, MarketStatus, TrustMRRCategory } from "@/lib/types";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, type ReactNode } from "react";
+import { FilterPill } from "@/components/ui/filter-pill";
+import { SearchInput } from "@/components/ui/search-input";
+import type { MarketType, MarketStatus, TrustMRRCategory } from "@/lib/types";
 
 const statusOptions: { value: MarketStatus | "closing-soon" | "all"; label: string }[] = [
   { value: "all", label: "All" },
@@ -25,6 +26,8 @@ const sortOptions = [
   { value: "popular", label: "Popular" },
   { value: "newest", label: "Newest" },
   { value: "biggest-pot", label: "Biggest Pot" },
+  { value: "yes-odds-desc", label: "Most Bullish" },
+  { value: "yes-odds-asc", label: "Most Bearish" },
 ] as const;
 
 const categoryOptions: { value: TrustMRRCategory | "all"; label: string }[] = [
@@ -39,121 +42,80 @@ const categoryOptions: { value: TrustMRRCategory | "all"; label: string }[] = [
   { value: "social-media", label: "Social" },
 ];
 
-function FilterPill({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`btn btn-xs ${
-        active ? "btn-primary btn-outline" : "btn-ghost"
-      }`}
-    >
-      {children}
-    </button>
+interface MarketsFiltersProps {
+  filters: { status: string; type: string; category: string; sort: string; search: string };
+  children: ReactNode;
+}
+
+export function MarketsFilters({ filters, children }: MarketsFiltersProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const updateParams = useCallback(
+    (updates: Record<string, string | undefined>) => {
+      const params = new URLSearchParams(searchParams.toString());
+      for (const [key, value] of Object.entries(updates)) {
+        if (
+          !value ||
+          value === "all" ||
+          (key === "sort" && value === "closing-soon") ||
+          (key === "status" && value === "closing-soon")
+        ) {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      }
+      const qs = params.toString();
+      router.push(qs ? `/markets?${qs}` : "/markets");
+    },
+    [router, searchParams]
   );
-}
 
-interface MarketsClientProps {
-  markets: Market[];
-  startups: Startup[];
-}
-
-export function MarketsClient({ markets, startups }: MarketsClientProps) {
-  const [status, setStatus] = useState<MarketStatus | "closing-soon" | "all">("closing-soon");
-  const [type, setType] = useState<MarketType | "all">("all");
-  const [sort, setSort] = useState<"popular" | "closing-soon" | "newest" | "biggest-pot">("closing-soon");
-  const [category, setCategory] = useState<TrustMRRCategory | "all">("all");
-
-  const startupMap = useMemo(() => {
-    const map = new Map<string, Startup>();
-    for (const s of startups) map.set(s.slug, s);
-    return map;
-  }, [startups]);
-
-  const filtered = useMemo(() => {
-    let result = [...markets];
-
-    if (status === "closing-soon") {
-      const tenDays = 10 * 24 * 60 * 60 * 1000;
-      result = result.filter(
-        (m) => m.status === "open" && new Date(m.closesAt).getTime() - Date.now() < tenDays
-      );
-    } else if (status !== "all") {
-      result = result.filter((m) => m.status === status);
-    }
-
-    if (type !== "all") {
-      result = result.filter((m) => m.type === type);
-    }
-
-    if (category !== "all") {
-      result = result.filter((m) => {
-        const startup = startupMap.get(m.startupSlug);
-        return startup?.category === category;
-      });
-    }
-
-    switch (sort) {
-      case "popular":
-        result.sort((a, b) => b.totalBettors - a.totalBettors);
-        break;
-      case "closing-soon":
-        result.sort((a, b) => new Date(a.closesAt).getTime() - new Date(b.closesAt).getTime());
-        break;
-      case "newest":
-        result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        break;
-      case "biggest-pot":
-        result.sort((a, b) => b.totalCredits - a.totalCredits);
-        break;
-    }
-
-    return result;
-  }, [markets, startups, startupMap, status, type, sort, category]);
+  function setFilter(key: string, value: string) {
+    updateParams({ [key]: value, page: undefined });
+  }
 
   return (
     <div className="space-y-6 animate-fade-up">
       <h1 className="text-2xl font-bold">Markets</h1>
 
+      <SearchInput
+        value={filters.search}
+        placeholder="Search markets, startups..."
+        onChange={(value) => updateParams({ q: value || undefined, page: undefined })}
+      />
+
       <div className="space-y-3">
         <div className="flex flex-wrap gap-1.5">
           {statusOptions.map((o) => (
-            <FilterPill key={o.value} active={status === o.value} onClick={() => setStatus(o.value)}>
+            <FilterPill key={o.value} active={filters.status === o.value} onClick={() => setFilter("status", o.value)}>
               {o.label}
             </FilterPill>
           ))}
           <div className="divider divider-horizontal mx-0" />
           {typeOptions.map((o) => (
-            <FilterPill key={o.value} active={type === o.value} onClick={() => setType(o.value)}>
+            <FilterPill key={o.value} active={filters.type === o.value} onClick={() => setFilter("type", o.value)}>
               {o.label}
             </FilterPill>
           ))}
         </div>
         <div className="flex flex-wrap gap-1.5">
           {categoryOptions.map((o) => (
-            <FilterPill key={o.value} active={category === o.value} onClick={() => setCategory(o.value)}>
+            <FilterPill key={o.value} active={filters.category === o.value} onClick={() => setFilter("category", o.value)}>
               {o.label}
             </FilterPill>
           ))}
           <div className="divider divider-horizontal mx-0" />
           {sortOptions.map((o) => (
-            <FilterPill key={o.value} active={sort === o.value} onClick={() => setSort(o.value)}>
+            <FilterPill key={o.value} active={filters.sort === o.value} onClick={() => setFilter("sort", o.value)}>
               {o.label}
             </FilterPill>
           ))}
         </div>
       </div>
 
-      {filtered.length > 0 ? (
-        <div className="stagger-children grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((market) => {
-            const startup = startupMap.get(market.startupSlug);
-            if (!startup) return null;
-            return <MarketCard key={market.id} market={market} startup={startup} />;
-          })}
-        </div>
-      ) : (
-        <p className="py-16 text-center text-base-content/50">No markets match your filters.</p>
-      )}
+      {children}
     </div>
   );
 }

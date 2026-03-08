@@ -25,8 +25,8 @@ export default async function HomePage() {
       <div className="flex flex-col items-center gap-5 py-6 text-center">
         <h1 className="text-5xl font-bold tracking-tight lg:text-6xl">
           Bet on <span className="text-primary">startups.</span>{" "}
-          <span className="inline-flex items-baseline">
-            Win <Image src="/banana.svg" alt="bananas" width={40} height={40} className="mx-1 inline-block -mb-1" />
+          <span className="inline-flex items-baseline gap-2">
+            Win<Image src="/banana.svg" alt="bananas" width={40} height={40} className="inline-block -mb-1" />
           </span>
         </h1>
         <p className="text-sm text-base-content/50">

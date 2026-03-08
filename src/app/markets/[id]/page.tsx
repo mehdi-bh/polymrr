@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { OddsBar } from "@/components/market/odds-bar";
@@ -20,6 +21,21 @@ import { Clock, Users, ExternalLink, MessageCircle } from "lucide-react";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const market = await getMarketById(id);
+  if (!market) return {};
+  const startup = await getStartupBySlug(market.startupSlug);
+  return {
+    title: `${market.question} — ${startup?.name ?? "Market"}`,
+    description: `${Math.round(market.yesOdds * 100)}% chance YES. ${market.totalBettors} bettors, ${market.totalCredits.toLocaleString()} bananas in the pool.`,
+    openGraph: {
+      title: market.question,
+      description: `${startup?.name ?? "Startup"} — ${Math.round(market.yesOdds * 100)}% YES. Bet now on PolyMRR.`,
+    },
+  };
 }
 
 const typeLabels: Record<string, string> = {
@@ -146,7 +162,7 @@ export default async function MarketPage({ params }: PageProps) {
               <div className="card-body p-5">
                 <div className={`mono-num text-2xl font-bold ${(startup.growth30d ?? 0) >= 0 ? "text-yes" : "text-no"}`}>
                   {startup.growth30d !== null
-                    ? `${startup.growth30d >= 0 ? "+" : ""}${(startup.growth30d * 100).toFixed(0)}%`
+                    ? `${startup.growth30d >= 0 ? "+" : ""}${startup.growth30d.toFixed(1)}%`
                     : "N/A"}
                 </div>
                 <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-base-content/50">30d Growth</div>

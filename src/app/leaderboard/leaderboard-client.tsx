@@ -3,8 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Credits } from "@/components/ui/credits";
+import { Pagination } from "@/components/ui/pagination";
 import { Flame, Trophy } from "lucide-react";
 import type { LeaderboardEntry } from "@/lib/types";
+
+const PER_PAGE = 20;
 
 const tabs = [
   { value: "all-time", label: "All Time" },
@@ -13,10 +16,15 @@ const tabs = [
 
 interface LeaderboardClientProps {
   entries: LeaderboardEntry[];
+  page: number;
 }
 
-export function LeaderboardClient({ entries }: LeaderboardClientProps) {
+export function LeaderboardClient({ entries, page }: LeaderboardClientProps) {
   const [tab, setTab] = useState<"all-time" | "this-month">("all-time");
+
+  const totalPages = Math.ceil(entries.length / PER_PAGE);
+  const paginated = entries.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const rankOffset = (page - 1) * PER_PAGE;
 
   return (
     <div className="space-y-6 animate-fade-up">
@@ -51,8 +59,8 @@ export function LeaderboardClient({ entries }: LeaderboardClientProps) {
             </tr>
           </thead>
           <tbody>
-            {entries.map((entry, i) => {
-              const rank = i + 1;
+            {paginated.map((entry, i) => {
+              const rank = rankOffset + i + 1;
               return (
                 <tr key={entry.userId} className="border-base-300/50 hover">
                   <td>
@@ -105,6 +113,8 @@ export function LeaderboardClient({ entries }: LeaderboardClientProps) {
           </tbody>
         </table>
       </div>
+
+      <Pagination currentPage={page} totalPages={totalPages} />
     </div>
   );
 }

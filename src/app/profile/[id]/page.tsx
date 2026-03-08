@@ -187,7 +187,7 @@ export default async function ProfilePage({ params }: PageProps) {
                       <span className="badge badge-warning badge-xs badge-outline">FOR SALE</span>
                     )}
                     <span className={`mono-num text-xs font-medium ${(s.growth30d ?? 0) >= 0 ? "text-yes" : "text-no"}`}>
-                      {s.growth30d !== null ? `${s.growth30d >= 0 ? "+" : ""}${(s.growth30d * 100).toFixed(0)}%` : ""}
+                      {s.growth30d !== null ? `${s.growth30d >= 0 ? "+" : ""}${s.growth30d.toFixed(1)}%` : ""}
                     </span>
                   </div>
                 </Link>

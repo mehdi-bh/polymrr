@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { MarketCard } from "@/components/market/market-card";
@@ -16,6 +17,20 @@ import { ExternalLink, TrendingUp, TrendingDown, Users, Calendar, Plus } from "l
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const startup = await getStartupBySlug(slug);
+  if (!startup) return {};
+  return {
+    title: `${startup.name} — Prediction Markets`,
+    description: `${startup.description}. Current MRR: ${formatCents(startup.revenue.mrr)}. Track ${startup.name}'s growth and bet on their future.`,
+    openGraph: {
+      title: `${startup.name} on PolyMRR`,
+      description: `${startup.description}. MRR: ${formatCents(startup.revenue.mrr)}.`,
+    },
+  };
 }
 
 export default async function StartupPage({ params }: PageProps) {
@@ -90,7 +105,7 @@ export default async function StartupPage({ params }: PageProps) {
               <div className="flex items-center gap-1">
                 {growthPositive ? <TrendingUp className="h-5 w-5 text-yes" /> : <TrendingDown className="h-5 w-5 text-no" />}
                 <span className={`mono-num text-2xl font-bold ${growthPositive ? "text-yes" : "text-no"}`}>
-                  {startup.growth30d !== null ? `${(startup.growth30d * 100).toFixed(0)}%` : "N/A"}
+                  {startup.growth30d !== null ? `${startup.growth30d.toFixed(1)}%` : "N/A"}
                 </span>
               </div>
               <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-base-content/50">30d Growth</div>

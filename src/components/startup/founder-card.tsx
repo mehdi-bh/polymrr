@@ -75,7 +75,7 @@ export function FounderCard({ founder, xFollowerCount, allStartups, allMarkets }
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/40">Growth</span>
             <span className={`mono-num font-bold ${avgGrowth >= 0 ? "text-yes" : "text-no"}`}>
-              {avgGrowth >= 0 ? "+" : ""}{(avgGrowth * 100).toFixed(1)}%
+              {avgGrowth >= 0 ? "+" : ""}{avgGrowth.toFixed(1)}%
             </span>
           </div>
           <div className="flex items-center justify-between">

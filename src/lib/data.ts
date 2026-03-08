@@ -140,6 +140,227 @@ export async function getMrrHistory(slug: string): Promise<MrrSnapshot[]> {
   }));
 }
 
+export async function getStartupMarketStats(
+  slugs: string[]
+): Promise<Map<string, { activeMarketCount: number; sentiment: number }>> {
+  const result = new Map<string, { activeMarketCount: number; sentiment: number }>();
+  for (const slug of slugs) result.set(slug, { activeMarketCount: 0, sentiment: 50 });
+  if (slugs.length === 0) return result;
+
+  const supabase = await createClient();
+  const { data: rows } = await supabase
+    .from("markets")
+    .select("startup_slug, yes_odds")
+    .in("startup_slug", slugs)
+    .eq("status", "open");
+
+  if (!rows) return result;
+
+  const bySlug = new Map<string, number[]>();
+  for (const r of rows) {
+    const arr = bySlug.get(r.startup_slug) ?? [];
+    arr.push(r.yes_odds);
+    bySlug.set(r.startup_slug, arr);
+  }
+
+  for (const [slug, odds] of bySlug) {
+    const sentiment = Math.round(odds.reduce((a, b) => a + b, 0) / odds.length);
+    result.set(slug, { activeMarketCount: odds.length, sentiment });
+  }
+
+  return result;
+}
+
+export interface StartupFilters {
+  category?: string;
+  sort?: string;
+  forSale?: boolean;
+  search?: string;
+  page?: number;
+  perPage?: number;
+}
+
+export async function getStartupsPaginated(
+  filters: StartupFilters = {}
+): Promise<{ data: Startup[]; total: number }> {
+  const supabase = await createClient();
+  const page = filters.page ?? 1;
+  const perPage = filters.perPage ?? 12;
+  const from = (page - 1) * perPage;
+  const to = from + perPage - 1;
+
+  let query = supabase.from("startups").select("*", { count: "exact" });
+
+  if (filters.category && filters.category !== "all") {
+    query = query.eq("category", filters.category);
+  }
+  if (filters.forSale) {
+    query = query.eq("on_sale", true);
+  }
+
+  if (filters.search) {
+    const term = `%${filters.search}%`;
+    // Search cofounders and tech stack in parallel for matching slugs
+    const [{ data: cofRows }, { data: techRows }] = await Promise.all([
+      supabase.from("startup_cofounders").select("startup_slug").or(`x_name.ilike.${term},x_handle.ilike.${term}`),
+      supabase.from("startup_tech_stack").select("startup_slug").ilike("slug", term),
+    ]);
+    const relatedSlugs = [...new Set([
+      ...(cofRows ?? []).map((r) => r.startup_slug),
+      ...(techRows ?? []).map((r) => r.startup_slug),
+    ])];
+    const orParts = [
+      `name.ilike.${term}`,
+      `description.ilike.${term}`,
+      `country.ilike.${term}`,
+      `x_handle.ilike.${term}`,
+    ];
+    if (relatedSlugs.length > 0) {
+      orParts.push(`slug.in.(${relatedSlugs.join(",")})`);
+    }
+    query = query.or(orParts.join(","));
+  }
+
+  switch (filters.sort) {
+    case "growth-desc":
+      query = query.order("growth_30d", { ascending: false, nullsFirst: false });
+      break;
+    case "newest":
+      query = query.order("founded_date", { ascending: false, nullsFirst: false });
+      break;
+    case "customers-desc":
+      query = query.order("customers", { ascending: false, nullsFirst: false });
+      break;
+    case "followers-desc":
+      query = query.order("x_followers", { ascending: false, nullsFirst: false });
+      break;
+    case "alpha":
+      query = query.order("name", { ascending: true });
+      break;
+    case "mrr-desc":
+    default:
+      query = query.order("revenue_mrr", { ascending: false });
+      break;
+  }
+
+  const { data: rows, count } = await query.range(from, to);
+  if (!rows || rows.length === 0) return { data: [], total: count ?? 0 };
+
+  const slugs = rows.map((r) => r.slug);
+  const { techMap, cofounderMap } = await fetchStartupRelations(supabase, slugs);
+
+  const startups = rows.map((r) =>
+    mapStartup(r, techMap.get(r.slug) ?? [], cofounderMap.get(r.slug) ?? [])
+  );
+
+  return { data: startups, total: count ?? 0 };
+}
+
+export interface MarketFilters {
+  status?: string;
+  type?: string;
+  category?: string;
+  sort?: string;
+  search?: string;
+  page?: number;
+  perPage?: number;
+}
+
+export async function getMarketsPaginated(
+  filters: MarketFilters = {}
+): Promise<{ data: Market[]; total: number; startups: Map<string, Startup> }> {
+  const supabase = await createClient();
+  const page = filters.page ?? 1;
+  const perPage = filters.perPage ?? 12;
+  const from = (page - 1) * perPage;
+  const to = from + perPage - 1;
+
+  let query = supabase.from("markets").select("*", { count: "exact" });
+
+  if (filters.status === "closing-soon") {
+    const tenDaysFromNow = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
+    query = query.eq("status", "open").lte("closes_at", tenDaysFromNow);
+  } else if (filters.status && filters.status !== "all") {
+    query = query.eq("status", filters.status);
+  }
+
+  if (filters.type && filters.type !== "all") {
+    query = query.eq("type", filters.type);
+  }
+
+  // Category filter requires joining with startups — filter after fetch if set
+  // We'll handle this below
+
+  if (filters.search) {
+    const term = `%${filters.search}%`;
+    const { data: nameRows } = await supabase.from("startups").select("slug").ilike("name", term);
+    const slugMatches = (nameRows ?? []).map((r) => r.slug);
+    const orParts = [`question.ilike.${term}`];
+    if (slugMatches.length > 0) {
+      orParts.push(`startup_slug.in.(${slugMatches.join(",")})`);
+    }
+    query = query.or(orParts.join(","));
+  }
+
+  switch (filters.sort) {
+    case "popular":
+      query = query.order("total_bettors", { ascending: false });
+      break;
+    case "newest":
+      query = query.order("created_at", { ascending: false });
+      break;
+    case "biggest-pot":
+      query = query.order("total_credits", { ascending: false });
+      break;
+    case "yes-odds-desc":
+      query = query.order("yes_odds", { ascending: false });
+      break;
+    case "yes-odds-asc":
+      query = query.order("yes_odds", { ascending: true });
+      break;
+    case "closing-soon":
+    default:
+      query = query.order("closes_at", { ascending: true });
+      break;
+  }
+
+  // If category filter is set, we need to get startup slugs for that category first
+  if (filters.category && filters.category !== "all") {
+    const { data: catSlugs } = await supabase
+      .from("startups")
+      .select("slug")
+      .eq("category", filters.category);
+    if (!catSlugs || catSlugs.length === 0) return { data: [], total: 0, startups: new Map() };
+    query = query.in("startup_slug", catSlugs.map((s) => s.slug));
+  }
+
+  const { data: rows, count } = await query.range(from, to);
+  if (!rows || rows.length === 0) return { data: [], total: count ?? 0, startups: new Map() };
+
+  const markets = rows.map(mapMarket);
+
+  // Fetch only the startups needed for this page
+  const uniqueSlugs = [...new Set(markets.map((m) => m.startupSlug))];
+  const { data: startupRows } = await supabase
+    .from("startups")
+    .select("*")
+    .in("slug", uniqueSlugs);
+
+  const startupMap = new Map<string, Startup>();
+  if (startupRows) {
+    const slugs = startupRows.map((r) => r.slug);
+    const { techMap, cofounderMap } = await fetchStartupRelations(supabase, slugs);
+    for (const r of startupRows) {
+      startupMap.set(
+        r.slug,
+        mapStartup(r, techMap.get(r.slug) ?? [], cofounderMap.get(r.slug) ?? [])
+      );
+    }
+  }
+
+  return { data: markets, total: count ?? 0, startups: startupMap };
+}
+
 // -- Markets ----------------------------------------------------------------
 
 export async function getMarkets(): Promise<Market[]> {

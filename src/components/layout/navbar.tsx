@@ -6,11 +6,12 @@ import { createClient } from "@/lib/supabase/client";
 import { QuestPopup } from "@/components/ui/quest-popup";
 import { SignInButton } from "@/components/ui/sign-in-button";
 import type { User } from "@/lib/types";
+import Image from "next/image";
 import { TrendingUp, BarChart3, Trophy, LayoutDashboard, User as UserIcon, LogOut } from "lucide-react";
 
 const navLinks = [
-  { href: "/markets", label: "Markets", icon: TrendingUp },
-  { href: "/startups", label: "Startups", icon: BarChart3 },
+  { href: "/markets", label: "Markets", icon: BarChart3 },
+  { href: "/startups", label: "Startups", icon: TrendingUp },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
 ];
 
@@ -33,9 +34,7 @@ export function Navbar({ user, completedQuests }: NavbarProps) {
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15">
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </div>
+            <Image src="/icon.png" alt="PolyMRR" width={28} height={28} className="rounded-md" />
             <span className="text-lg font-bold tracking-tight">
               Poly<span className="text-primary">MRR</span>
             </span>
