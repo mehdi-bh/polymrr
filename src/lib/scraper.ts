@@ -11,6 +11,25 @@
  */
 
 const TRUSTMRR_BASE = "https://trustmrr.com";
+const MAX_RETRIES = 3;
+const INITIAL_BACKOFF_MS = 10_000; // 10s on first 429
+
+async function fetchWithRetry(url: string, init?: RequestInit): Promise<Response> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch(url, init);
+    if (res.status !== 429) return res;
+
+    if (attempt === MAX_RETRIES) return res;
+
+    const retryAfter = res.headers.get("retry-after");
+    const waitMs = retryAfter
+      ? parseInt(retryAfter, 10) * 1000
+      : INITIAL_BACKOFF_MS * Math.pow(2, attempt);
+    console.warn(`[scraper] 429 for ${url}, retrying in ${Math.round(waitMs / 1000)}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
+    await new Promise((r) => setTimeout(r, waitMs));
+  }
+  throw new Error("unreachable");
+}
 
 export interface ScrapedMrrPoint {
   date: string; // YYYY-MM-DD (first of month)
@@ -48,7 +67,7 @@ async function fetchRevenueTimeline(
 ): Promise<RevenueEntry[] | null> {
   const url = `${TRUSTMRR_BASE}/api/startup/revenue/${encodeURIComponent(slug)}?granularity=daily&period=all`;
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     headers: { "x-api-token": apiToken },
   });
 
@@ -98,7 +117,7 @@ export async function scrapeMrrHistory(
 ): Promise<ScrapedMrrPoint[] | null> {
   try {
     const pageUrl = `${TRUSTMRR_BASE}/startup/${encodeURIComponent(slug)}`;
-    const pageRes = await fetch(pageUrl, {
+    const pageRes = await fetchWithRetry(pageUrl, {
       headers: { "User-Agent": "PolyMRR/1.0 (prediction market platform)" },
     });
 

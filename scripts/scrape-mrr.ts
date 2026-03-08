@@ -8,7 +8,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { scrapeMrrHistory } from "@/lib/scraper";
 import { storeMrrHistory, logSync, updateSyncLog, updateProgress, isCancelled } from "@/lib/trustmrr";
 
-const DELAY_MS = 1500;
+const DELAY_MS = 3000;
+const BACKOFF_DELAY_MS = 30_000; // 30s cooldown after consecutive failures
+const MAX_CONSECUTIVE_FAILURES = 5; // pause after this many failures in a row
 
 async function main() {
   const admin = createAdminClient();
@@ -30,6 +32,7 @@ async function main() {
 
     let succeeded = 0;
     let processed = 0;
+    let consecutiveFailures = 0;
     const errors: string[] = [];
     let lines: string[] = [];
 
@@ -44,17 +47,27 @@ async function main() {
         if (points && points.length > 0) {
           await storeMrrHistory(admin, slug, points);
           succeeded++;
+          consecutiveFailures = 0;
           if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, `${processed}/${toScrape.length} ${slug}: ${points.length} months`, lines);
         } else {
+          consecutiveFailures++;
           if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, `${processed}/${toScrape.length} ${slug}: no data`, lines);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         errors.push(`${slug}: ${msg}`);
+        consecutiveFailures++;
         if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, `${processed}/${toScrape.length} ${slug}: FAILED ${msg}`, lines);
       }
 
-      await new Promise((r) => setTimeout(r, DELAY_MS));
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        console.warn(`[scrape-mrr] ${consecutiveFailures} consecutive failures, cooling down ${BACKOFF_DELAY_MS / 1000}s...`);
+        if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, `Cooling down ${BACKOFF_DELAY_MS / 1000}s after ${consecutiveFailures} failures`, lines);
+        await new Promise((r) => setTimeout(r, BACKOFF_DELAY_MS));
+        consecutiveFailures = 0;
+      } else {
+        await new Promise((r) => setTimeout(r, DELAY_MS));
+      }
     }
 
     console.log(`[scrape-mrr] Done: ${succeeded}/${toScrape.length}`);
