@@ -1,17 +1,22 @@
 /**
- * MRR history scraper for new startups only.
- *
- * Fetches historical MRR data for startups that have no entries in mrr_history yet.
- * Designed to run after sync-daily picks up new startups.
+ * MRR history scraper for new startups only (no mrr_history yet).
+ * Sorted by highest revenue first. Runs after sync-daily picks up new startups.
  *
  * Schedule: 5:00 AM UTC daily (via GitHub Actions)
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { scrapeMrrHistory } from "@/lib/scraper";
-import { storeMrrHistory, logSync, updateSyncLog, updateProgress, isCancelled } from "@/lib/trustmrr";
+import { scrapeMrrHistory, getAdaptiveDelay } from "@/lib/scraper";
+import {
+  storeMrrHistory,
+  logSync,
+  updateSyncLog,
+  updateProgress,
+  isCancelled,
+} from "@/lib/trustmrr";
 
-const DELAY_MS = 3000;
+const BASE_DELAY_MS = 3_000;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
   const admin = createAdminClient();
@@ -25,7 +30,11 @@ async function main() {
 
     const coveredSet = new Set(covered ?? []);
 
-    const { data: allStartups } = await admin.from("startups").select("slug");
+    const { data: allStartups } = await admin
+      .from("startups")
+      .select("slug")
+      .order("revenue_total", { ascending: false });
+
     const toScrape = (allStartups ?? []).filter((s) => !coveredSet.has(s.slug));
 
     if (toScrape.length === 0) {
@@ -40,15 +49,15 @@ async function main() {
     const errors: string[] = [];
     let lines: string[] = [];
 
-    if (logId) lines = await updateProgress(admin, logId, 0, toScrape.length, `${toScrape.length} new startups to scrape`, lines);
+    if (logId) lines = await updateProgress(admin, logId, 0, toScrape.length, `${toScrape.length} new startups`, lines);
 
     for (const { slug } of toScrape) {
-      if (logId && await isCancelled(admin, logId)) break;
-
+      if (logId && (await isCancelled(admin, logId))) break;
       processed++;
+
       try {
         const points = await scrapeMrrHistory(slug);
-        if (points && points.length > 0) {
+        if (points?.length) {
           await storeMrrHistory(admin, slug, points);
           succeeded++;
           if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, `${processed}/${toScrape.length} ${slug}: ${points.length} months`, lines);
@@ -62,15 +71,14 @@ async function main() {
         if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, `${processed}/${toScrape.length} ${slug}: FAILED ${msg}`, lines);
       }
 
-      await new Promise((r) => setTimeout(r, DELAY_MS));
+      await sleep(BASE_DELAY_MS + getAdaptiveDelay());
     }
 
     const failed = errors.length;
-    const status = failed === 0 ? "completed" : "partial";
     console.log(`[scrape-mrr-new] Done: ${succeeded} scraped, ${noData} no data, ${failed} failed / ${toScrape.length} total`);
 
     if (logId) {
-      await updateSyncLog(admin, logId, status, {
+      await updateSyncLog(admin, logId, failed === 0 ? "completed" : "partial", {
         total: toScrape.length, succeeded, no_data: noData, failed,
         errors: errors.length > 0 ? errors.slice(0, 20) : undefined,
         completed_at: new Date().toISOString(),
@@ -79,9 +87,7 @@ async function main() {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[scrape-mrr-new] Fatal: ${msg}`);
-    if (logId) {
-      await updateSyncLog(admin, logId, "failed", { error: msg, completed_at: new Date().toISOString() });
-    }
+    if (logId) await updateSyncLog(admin, logId, "failed", { error: msg, completed_at: new Date().toISOString() });
     process.exit(1);
   }
 }
