@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: "*/30 * * * *" # sync-frequent
     - cron: "0 2 * * *"    # sync-daily
-    - cron: "0 3 * * *"    # scrape-mrr
+    - cron: "0 5 * * *"    # scrape-mrr-new
     - cron: "0 4 * * *"    # generate-markets
     - cron: "0 0 * * *"    # resolve-markets
   workflow_dispatch:
@@ -17,6 +17,7 @@ on:
           - sync-daily
           - sync-frequent
           - scrape-mrr
+          - scrape-mrr-new
           - sync-startups
           - generate-markets
           - resolve-markets
@@ -50,15 +51,26 @@ jobs:
       - run: npx tsx scripts/sync-daily.ts
 
   scrape-mrr:
-    if: github.event.schedule == '0 3 * * *' || (github.event_name == 'workflow_dispatch' && inputs.job == 'scrape-mrr')
+    if: github.event_name == 'workflow_dispatch' && inputs.job == 'scrape-mrr'
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: npm }
       - run: npm ci
       - run: npx tsx scripts/scrape-mrr.ts
+
+  scrape-mrr-new:
+    if: github.event.schedule == '0 5 * * *' || (github.event_name == 'workflow_dispatch' && inputs.job == 'scrape-mrr-new')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npx tsx scripts/scrape-mrr-new.ts
 
   generate-markets:
     if: github.event.schedule == '0 4 * * *' || (github.event_name == 'workflow_dispatch' && inputs.job == 'generate-markets')
