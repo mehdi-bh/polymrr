@@ -267,23 +267,3 @@ export async function isCancelled(admin: Admin, id: number): Promise<boolean> {
     .single();
   return data?.status === "cancelled";
 }
-
-/** Get logId from x-log-id header (set by admin trigger), or create a new sync_log entry */
-export async function getOrCreateLogId(
-  admin: Admin,
-  request: Request,
-  source: string
-): Promise<number | null> {
-  const headerLogId = request.headers.get("x-log-id");
-  console.log(`[getOrCreateLogId] source=${source} x-log-id header="${headerLogId}"`);
-  if (headerLogId) {
-    const id = parseInt(headerLogId, 10);
-    if (!isNaN(id)) {
-      console.log(`[getOrCreateLogId] Reusing logId=${id} from header`);
-      return id;
-    }
-  }
-  const newId = await logSync(admin, source, "running");
-  console.log(`[getOrCreateLogId] Created new logId=${newId}`);
-  return newId;
-}

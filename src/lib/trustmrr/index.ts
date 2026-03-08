@@ -1,10 +1,8 @@
 /**
  * TrustMRR Data Collector
  *
- * Self-contained module for fetching startup data from the TrustMRR API
- * and storing it in Supabase. No application logic — just data collection.
- *
- * Usage: called by cron routes in /api/cron/sync-startups and /api/cron/sync-frequent
+ * Fetches startup data from the TrustMRR API and stores it in Supabase.
+ * Used by scripts in /scripts/ (run via GitHub Actions).
  */
 
 export {
@@ -24,5 +22,4 @@ export {
   updateSyncLog,
   updateProgress,
   isCancelled,
-  getOrCreateLogId,
 } from "./sync";
