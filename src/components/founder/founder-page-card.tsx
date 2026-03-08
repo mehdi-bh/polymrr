@@ -1,35 +1,30 @@
 import Link from "next/link";
 import { formatCents } from "@/lib/helpers";
-import type { Cofounder, Startup, Market } from "@/lib/types";
+import type { Startup } from "@/lib/types";
 import { XIcon } from "@/components/ui/x-icon";
 import { FounderAvatar } from "@/components/founder/founder-avatar";
 import { ArrowRight } from "lucide-react";
 
-interface FounderCardProps {
-  founder: Cofounder;
-  xFollowerCount: number | null;
-  allStartups: Startup[];
-  allMarkets: Market[];
+interface FounderPageCardProps {
+  xHandle: string;
+  xName: string | null;
+  startups: Startup[];
+  totalRevenue: number;
+  totalFollowers: number;
 }
 
-export function FounderCard({ founder, xFollowerCount, allStartups, allMarkets }: FounderCardProps) {
-  const name = founder.xName ?? founder.xHandle;
-  const totalMrr = allStartups.reduce((sum, s) => sum + s.revenue.mrr, 0);
-  const totalMarkets = allMarkets.filter((m) => m.status === "open").length;
-  const avgGrowth = allStartups.length > 0
-    ? allStartups.reduce((sum, s) => sum + (s.growth30d ?? 0), 0) / allStartups.length
-    : 0;
-  const totalRevenue = allStartups.reduce((sum, s) => sum + s.revenue.total, 0);
+export function FounderPageCard({ xHandle, xName, startups, totalRevenue, totalFollowers }: FounderPageCardProps) {
+  const name = xName ?? xHandle;
 
-  const topStartups = [...allStartups]
+  const topStartups = [...startups]
     .sort((a, b) => b.revenue.total - a.revenue.total)
     .slice(0, 3);
 
   return (
-    <div className="card border border-primary/20 bg-base-100 overflow-hidden">
+    <div className="card border border-primary/20 bg-base-100 flex flex-col overflow-hidden">
       <div className="flex items-center justify-end px-5 pt-4">
         <a
-          href={`https://x.com/${founder.xHandle}`}
+          href={`https://x.com/${xHandle}`}
           target="_blank"
           rel="noopener noreferrer"
           className="btn btn-ghost btn-xs btn-square opacity-50 hover:opacity-100"
@@ -38,48 +33,42 @@ export function FounderCard({ founder, xFollowerCount, allStartups, allMarkets }
         </a>
       </div>
 
-      <div className="card-body items-center gap-4 px-5 pb-5 pt-3">
+      <div className="card-body flex flex-1 flex-col items-center gap-4 px-5 pb-5 pt-3">
         <FounderAvatar
-          xHandle={founder.xHandle}
+          xHandle={xHandle}
           name={name}
-          size={80}
+          size={64}
         />
 
         <div className="text-center">
-          <div className="text-sm font-bold uppercase tracking-wide">@{founder.xHandle}</div>
+          <div className="text-sm font-bold uppercase tracking-wide">@{xHandle}</div>
           <div className="mono-num text-xs text-base-content/50">
-            {allStartups.length} startup{allStartups.length !== 1 ? "s" : ""} tracked
+            {startups.length} startup{startups.length !== 1 ? "s" : ""}
           </div>
         </div>
 
         <div className="h-px w-full bg-base-300" />
 
-        <div className="w-full space-y-2.5 text-[13px]">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/40">Combined MRR</span>
-            <span className="mono-num font-bold text-primary">{formatCents(totalMrr)}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/40">Growth</span>
-            <span className={`mono-num font-bold ${avgGrowth >= 0 ? "text-yes" : "text-no"}`}>
-              {avgGrowth >= 0 ? "+" : ""}{avgGrowth.toFixed(1)}%
-            </span>
-          </div>
+        <div className="w-full space-y-2 text-[13px]">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/40">Total Revenue</span>
-            <span className="mono-num font-semibold">{formatCents(totalRevenue)}</span>
+            <span className="mono-num font-bold text-primary">{formatCents(totalRevenue)}</span>
           </div>
-          {xFollowerCount && (
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/40">Startups</span>
+            <span className="mono-num font-semibold">{startups.length}</span>
+          </div>
+          {totalFollowers > 0 && (
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/40">X Followers</span>
-              <span className="mono-num font-semibold">{xFollowerCount.toLocaleString()}</span>
+              <span className="mono-num font-semibold">{totalFollowers.toLocaleString()}</span>
             </div>
           )}
         </div>
 
         <div className="h-px w-full bg-base-300" />
 
-        <div className="w-full space-y-1.5">
+        <div className="w-full flex-1 space-y-1.5">
           {topStartups.map((s, i) => (
             <div key={s.slug} className="flex items-center gap-2.5 rounded-lg bg-base-200/50 px-3 py-2">
               <span className={`mono-num text-[10px] font-bold shrink-0 w-3 text-center ${
@@ -104,13 +93,11 @@ export function FounderCard({ founder, xFollowerCount, allStartups, allMarkets }
           ))}
         </div>
 
-        <div className="h-px w-full bg-base-300" />
-
         <Link
-          href={`/markets/create?founder=${founder.xHandle}`}
-          className="btn btn-primary btn-sm w-full gap-1.5"
+          href={`/markets/create?founder=${xHandle}`}
+          className="btn btn-primary btn-sm mt-auto w-full gap-1.5"
         >
-          Bet on this founder ({totalMarkets})
+          Bet on this founder
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>

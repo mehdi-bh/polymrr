@@ -74,6 +74,7 @@ export function mapMarket(row: any): Market {
     closesAt: row.closes_at,
     resolvedAt: row.resolved_at,
     resolvedOutcome: row.resolved_outcome,
+    founderXHandle: row.founder_x_handle ?? null,
   };
 }
 

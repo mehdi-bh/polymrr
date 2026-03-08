@@ -5,7 +5,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { resolveMarket } from "@/lib/market-templates";
+import { resolveMarket, resolveFounderMarket } from "@/lib/market-templates";
 import { logSync, updateSyncLog, updateProgress, isCancelled } from "@/lib/trustmrr";
 
 function parseMrrTarget(criteria: string): number | null {
@@ -25,11 +25,15 @@ function parseGrowthTarget(criteria: string): number | null {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function determineOutcome(market: any): "yes" | "no" | null {
+function determineOutcome(market: any, founderStartups?: any[]): "yes" | "no" | null {
   const startup = market.startups;
   if (!startup) return null;
 
   if (market.resolution_config) {
+    // Founder markets need aggregation across all founder startups
+    if (market.type === "founder" && founderStartups) {
+      return resolveFounderMarket(market.resolution_config, founderStartups, market.startup_slug);
+    }
     return resolveMarket(market.resolution_config, startup);
   }
 
@@ -114,7 +118,21 @@ async function main() {
 
     const market = pending[i];
     try {
-      const outcome = determineOutcome(market);
+      // For founder markets, fetch all startups for this founder
+      let founderStartups: any[] | undefined;
+      if (market.type === "founder" && market.founder_x_handle) {
+        const { data: cofRows } = await admin
+          .from("startup_cofounders")
+          .select("startup_slug")
+          .eq("x_handle", market.founder_x_handle);
+        if (cofRows && cofRows.length > 0) {
+          const slugs = cofRows.map((r: any) => r.startup_slug);
+          const { data: rows } = await admin.from("startups").select("*").in("slug", slugs);
+          founderStartups = rows ?? [];
+        }
+      }
+
+      const outcome = determineOutcome(market, founderStartups);
       if (outcome === null) {
         if (logId) lines = await updateProgress(admin, logId, i + 1, pending.length, `${market.id.slice(0, 8)} skipped`, lines);
         continue;

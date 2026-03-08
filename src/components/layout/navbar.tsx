@@ -7,11 +7,12 @@ import { QuestPopup } from "@/components/ui/quest-popup";
 import { SignInButton } from "@/components/ui/sign-in-button";
 import type { User } from "@/lib/types";
 import Image from "next/image";
-import { TrendingUp, BarChart3, Trophy, LayoutDashboard, User as UserIcon, LogOut } from "lucide-react";
+import { TrendingUp, BarChart3, Trophy, LayoutDashboard, User as UserIcon, LogOut, Flame } from "lucide-react";
 
 const navLinks = [
   { href: "/markets", label: "Markets", icon: BarChart3 },
   { href: "/startups", label: "Startups", icon: TrendingUp },
+  { href: "/founders", label: "Founders", icon: Flame },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
 ];
 

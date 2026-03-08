@@ -259,6 +259,100 @@ export async function getStartupsPaginated(
   return { data: startups, total: count ?? 0 };
 }
 
+// -- Founders ---------------------------------------------------------------
+
+export interface FounderData {
+  xHandle: string;
+  xName: string | null;
+  startups: Startup[];
+  totalRevenue: number;
+  totalFollowers: number;
+}
+
+export async function getFoundersPaginated(
+  filters: { search?: string; sort?: string; page?: number; perPage?: number } = {}
+): Promise<{ data: FounderData[]; total: number }> {
+  const supabase = await createClient();
+  const page = filters.page ?? 1;
+  const perPage = filters.perPage ?? 12;
+
+  // Get all unique cofounders
+  let cofQuery = supabase.from("startup_cofounders").select("x_handle, x_name");
+  if (filters.search) {
+    const term = `%${filters.search}%`;
+    cofQuery = cofQuery.or(`x_name.ilike.${term},x_handle.ilike.${term}`);
+  }
+  const { data: allCofounders } = await cofQuery;
+  if (!allCofounders || allCofounders.length === 0) return { data: [], total: 0 };
+
+  // Deduplicate by x_handle
+  const uniqueMap = new Map<string, { xHandle: string; xName: string | null }>();
+  for (const c of allCofounders) {
+    if (!uniqueMap.has(c.x_handle)) {
+      uniqueMap.set(c.x_handle, { xHandle: c.x_handle, xName: c.x_name });
+    }
+  }
+  const uniqueFounders = Array.from(uniqueMap.values());
+
+  // Fetch all startups for these founders
+  const { data: cofRows } = await supabase
+    .from("startup_cofounders")
+    .select("startup_slug, x_handle")
+    .in("x_handle", uniqueFounders.map((f) => f.xHandle));
+
+  const founderSlugs = new Map<string, string[]>();
+  for (const r of cofRows ?? []) {
+    const arr = founderSlugs.get(r.x_handle) ?? [];
+    arr.push(r.startup_slug);
+    founderSlugs.set(r.x_handle, arr);
+  }
+
+  const allSlugs = [...new Set((cofRows ?? []).map((r) => r.startup_slug))];
+  const { data: startupRows } = await supabase.from("startups").select("*").in("slug", allSlugs);
+  const { techMap, cofounderMap } = await fetchStartupRelations(supabase, allSlugs);
+
+  const startupMap = new Map<string, Startup>();
+  for (const r of startupRows ?? []) {
+    startupMap.set(r.slug, mapStartup(r, techMap.get(r.slug) ?? [], cofounderMap.get(r.slug) ?? []));
+  }
+
+  // Build founder data
+  let founders: FounderData[] = uniqueFounders.map((f) => {
+    const slugs = founderSlugs.get(f.xHandle) ?? [];
+    const startups = slugs.map((s) => startupMap.get(s)).filter(Boolean) as Startup[];
+    return {
+      xHandle: f.xHandle,
+      xName: f.xName,
+      startups,
+      totalRevenue: startups.reduce((sum, s) => sum + s.revenue.total, 0),
+      totalFollowers: Math.max(0, ...startups.map((s) => s.xFollowerCount ?? 0)),
+    };
+  });
+
+  // Sort
+  switch (filters.sort) {
+    case "startups-desc":
+      founders.sort((a, b) => b.startups.length - a.startups.length);
+      break;
+    case "followers-desc":
+      founders.sort((a, b) => b.totalFollowers - a.totalFollowers);
+      break;
+    case "alpha":
+      founders.sort((a, b) => a.xHandle.localeCompare(b.xHandle));
+      break;
+    case "revenue-desc":
+    default:
+      founders.sort((a, b) => b.totalRevenue - a.totalRevenue);
+      break;
+  }
+
+  const total = founders.length;
+  const from = (page - 1) * perPage;
+  founders = founders.slice(from, from + perPage);
+
+  return { data: founders, total };
+}
+
 export interface MarketFilters {
   status?: string;
   type?: string;

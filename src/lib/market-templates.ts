@@ -13,11 +13,15 @@ export type MetricId =
   | "active_subs"
   | "growth_30d"
   | "profit_margin"
-  | "on_sale";
+  | "on_sale"
+  | "founder_revenue"
+  | "founder_startups"
+  | "founder_followers"
+  | "founder_top_startup";
 
 export type ConditionId = "gte" | "lte" | "eq";
 
-export type MarketType = "mrr-target" | "growth-race" | "acquisition" | "survival";
+export type MarketType = "mrr-target" | "growth-race" | "acquisition" | "survival" | "founder";
 
 export interface ResolutionConfig {
   metric: MetricId;
@@ -34,6 +38,7 @@ export interface MarketBlueprint {
   closesAt: string;
   seedSide: "yes" | "no";
   seedAmount: number;
+  founderXHandle?: string;
 }
 
 export interface MetricDef {
@@ -110,6 +115,38 @@ export const METRICS: Record<MetricId, MetricDef> = {
     validConditions: ["eq"],
     marketType: "acquisition",
   },
+  founder_revenue: {
+    id: "founder_revenue",
+    dbColumn: "revenue_total",
+    unit: "cents",
+    label: "Total Revenue",
+    validConditions: ["gte"],
+    marketType: "founder",
+  },
+  founder_startups: {
+    id: "founder_startups",
+    dbColumn: "startup_count",
+    unit: "count",
+    label: "Startups",
+    validConditions: ["gte"],
+    marketType: "founder",
+  },
+  founder_followers: {
+    id: "founder_followers",
+    dbColumn: "x_follower_count",
+    unit: "count",
+    label: "X Followers",
+    validConditions: ["gte", "lte"],
+    marketType: "founder",
+  },
+  founder_top_startup: {
+    id: "founder_top_startup",
+    dbColumn: "revenue_total",
+    unit: "boolean",
+    label: "Top Startup",
+    validConditions: ["eq"],
+    marketType: "founder",
+  },
 };
 
 const CONDITION_LABELS: Record<ConditionId, string> = {
@@ -139,6 +176,24 @@ function formatTarget(target: number, unit: MetricDef["unit"]): string {
 
 export function generateQuestion(blueprint: MarketBlueprint, startupName: string): string {
   const metric = METRICS[blueprint.metric];
+  const founderHandle = blueprint.founderXHandle ? `@${blueprint.founderXHandle}` : startupName;
+
+  if (blueprint.metric === "founder_top_startup") {
+    return `Will ${startupName} be ${founderHandle}'s #1 startup by revenue?`;
+  }
+  if (blueprint.metric === "founder_revenue") {
+    const targetStr = formatTarget(blueprint.target, metric.unit);
+    return `Will ${founderHandle} reach ${targetStr} total revenue?`;
+  }
+  if (blueprint.metric === "founder_startups") {
+    const targetStr = formatTarget(blueprint.target, metric.unit);
+    return `Will ${founderHandle} have ${targetStr}+ startups?`;
+  }
+  if (blueprint.metric === "founder_followers") {
+    const targetStr = formatTarget(blueprint.target, metric.unit);
+    const condLabel = blueprint.condition === "gte" ? "reach" : "drop below";
+    return `Will ${founderHandle} ${condLabel} ${targetStr} X followers?`;
+  }
   if (metric.unit === "boolean") {
     return `Will ${startupName} be listed for sale?`;
   }
@@ -150,6 +205,14 @@ export function generateQuestion(blueprint: MarketBlueprint, startupName: string
 export function generateCriteria(blueprint: MarketBlueprint, startupName: string): string {
   const metric = METRICS[blueprint.metric];
   const targetStr = formatTarget(blueprint.target, metric.unit);
+  const founderHandle = blueprint.founderXHandle ? `@${blueprint.founderXHandle}` : startupName;
+
+  if (blueprint.metric === "founder_top_startup") {
+    return `Resolves YES if ${startupName} has the highest total revenue among ${founderHandle}'s startups by close date. Data from TrustMRR.`;
+  }
+  if (blueprint.metric.startsWith("founder_")) {
+    return `Resolves YES if ${founderHandle}'s ${metric.label} ${CONDITION_LABELS[blueprint.condition]} ${targetStr} by close date. Data from TrustMRR.`;
+  }
   return `Resolves YES if ${startupName}'s ${metric.label} ${CONDITION_LABELS[blueprint.condition]} ${targetStr} by close date. Data from TrustMRR.`;
 }
 
@@ -163,9 +226,20 @@ export function buildResolutionConfig(blueprint: MarketBlueprint): ResolutionCon
   };
 }
 
+export function isFounderMetric(metric: MetricId): boolean {
+  return metric.startsWith("founder_");
+}
+
+export const FOUNDER_METRICS = Object.values(METRICS).filter((m) => m.marketType === "founder");
+export const STARTUP_METRICS = Object.values(METRICS).filter((m) => m.marketType !== "founder");
+
 export function validateBlueprint(blueprint: MarketBlueprint): string | null {
   const metric = METRICS[blueprint.metric];
   if (!metric) return `Unknown metric: ${blueprint.metric}`;
+
+  if (isFounderMetric(blueprint.metric) && !blueprint.founderXHandle) {
+    return "Founder markets require a founder handle";
+  }
 
   if (!metric.validConditions.includes(blueprint.condition)) {
     return `Condition "${blueprint.condition}" is not valid for metric "${metric.label}"`;
@@ -196,10 +270,9 @@ export async function findDuplicate(supabase: any, blueprint: MarketBlueprint): 
   const dayStart = `${closesDate}T00:00:00Z`;
   const dayEnd = `${closesDate}T23:59:59Z`;
 
-  const { data } = await supabase
+  let query = supabase
     .from("markets")
     .select("id")
-    .eq("startup_slug", blueprint.startupSlug)
     .filter("resolution_config->>metric", "eq", blueprint.metric)
     .filter("resolution_config->>condition", "eq", blueprint.condition)
     .filter("resolution_config->>target", "eq", String(blueprint.target))
@@ -207,6 +280,18 @@ export async function findDuplicate(supabase: any, blueprint: MarketBlueprint): 
     .lte("closes_at", dayEnd)
     .limit(1);
 
+  // For founder markets, dedup by founder handle (not startup_slug, which is just an anchor)
+  // For founder_top_startup, also check startup_slug since it matters
+  if (blueprint.founderXHandle) {
+    query = query.eq("founder_x_handle", blueprint.founderXHandle);
+    if (blueprint.metric === "founder_top_startup") {
+      query = query.eq("startup_slug", blueprint.startupSlug);
+    }
+  } else {
+    query = query.eq("startup_slug", blueprint.startupSlug);
+  }
+
+  const { data } = await query;
   return (data?.length ?? 0) > 0;
 }
 
@@ -224,6 +309,10 @@ export const METRIC_DESCRIPTIONS: Record<MetricId, string> = {
   growth_30d: "Month-over-month revenue growth rate",
   profit_margin: "Percentage of revenue that is profit after costs",
   on_sale: "Whether the startup is listed for sale on a marketplace",
+  founder_revenue: "Total revenue across all of this founder's startups",
+  founder_startups: "Number of startups this founder is building",
+  founder_followers: "The founder's X follower count",
+  founder_top_startup: "Which startup will be the founder's highest-revenue product",
 };
 
 // ---------------------------------------------------------------------------
@@ -314,12 +403,78 @@ export function generateSuggestions(startup: Startup): BetSuggestion[] {
   return suggestions.slice(0, 4);
 }
 
+export function generateFounderSuggestions(
+  founderXHandle: string,
+  startups: Startup[]
+): BetSuggestion[] {
+  const suggestions: BetSuggestion[] = [];
+  const totalRevenue = startups.reduce((sum, s) => sum + s.revenue.total, 0);
+  const totalFollowers = Math.max(...startups.map((s) => s.xFollowerCount ?? 0));
+
+  // Revenue milestone
+  if (totalRevenue > 0) {
+    const target = niceRoundCents(Math.round(totalRevenue * 1.5));
+    suggestions.push({
+      label: `Reach ${formatCents(target)} total revenue`,
+      description: `Currently ${formatCents(totalRevenue)} across ${startups.length} startups`,
+      metric: "founder_revenue",
+      condition: "gte",
+      target,
+      daysFromNow: 90,
+    });
+  }
+
+  // Ship another startup
+  if (startups.length > 0) {
+    suggestions.push({
+      label: `Ship ${startups.length + 1}+ startups`,
+      description: `Currently building ${startups.length} startup${startups.length !== 1 ? "s" : ""}`,
+      metric: "founder_startups",
+      condition: "gte",
+      target: startups.length + 1,
+      daysFromNow: 90,
+    });
+  }
+
+  // Follower milestone
+  if (totalFollowers > 100) {
+    const target = niceRoundCount(Math.round(totalFollowers * 1.5));
+    suggestions.push({
+      label: `Reach ${target.toLocaleString()} X followers`,
+      description: `Currently ${totalFollowers.toLocaleString()} followers`,
+      metric: "founder_followers",
+      condition: "gte",
+      target,
+      daysFromNow: 90,
+    });
+  }
+
+  // Top startup (if 2+ startups)
+  if (startups.length >= 2) {
+    const sorted = [...startups].sort((a, b) => b.revenue.total - a.revenue.total);
+    const top = sorted[0];
+    suggestions.push({
+      label: `${top.name} stays #1`,
+      description: `Currently ${formatCents(top.revenue.total)} total revenue`,
+      metric: "founder_top_startup",
+      condition: "eq",
+      target: 1,
+      daysFromNow: 180,
+    });
+  }
+
+  return suggestions.slice(0, 4);
+}
+
 // ---------------------------------------------------------------------------
 // Resolution
 // ---------------------------------------------------------------------------
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function resolveMarket(config: { metric: string; condition: string; target: number; dbColumn: string }, startupRow: any): "yes" | "no" | null {
+  // Founder metrics require custom resolution (aggregation across all startups)
+  if (config.metric.startsWith("founder_")) return null;
+
   const actual = startupRow[config.dbColumn];
   if (actual === null || actual === undefined) return null;
 
@@ -330,4 +485,45 @@ export function resolveMarket(config: { metric: string; condition: string; targe
   if (!comparator) return null;
 
   return comparator(numActual, config.target) ? "yes" : "no";
+}
+
+/**
+ * Resolve a founder market. Requires all startups for the founder.
+ * @param config — resolution config from the market
+ * @param founderStartups — all startup rows for the founder (raw DB rows with snake_case keys)
+ * @param marketStartupSlug — the startup_slug on this market (used for founder_top_startup)
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function resolveFounderMarket(
+  config: { metric: string; condition: string; target: number; dbColumn: string },
+  founderStartups: any[],
+  marketStartupSlug: string
+): "yes" | "no" | null {
+  if (founderStartups.length === 0) return null;
+
+  const comparator = CONDITIONS[config.condition as ConditionId];
+  if (!comparator) return null;
+
+  switch (config.metric) {
+    case "founder_revenue": {
+      const total = founderStartups.reduce((sum, s) => sum + (Number(s.revenue_total) || 0), 0);
+      return comparator(total, config.target) ? "yes" : "no";
+    }
+    case "founder_startups": {
+      return comparator(founderStartups.length, config.target) ? "yes" : "no";
+    }
+    case "founder_followers": {
+      const max = Math.max(...founderStartups.map((s) => Number(s.x_follower_count) || 0));
+      return comparator(max, config.target) ? "yes" : "no";
+    }
+    case "founder_top_startup": {
+      const sorted = [...founderStartups].sort(
+        (a, b) => (Number(b.revenue_total) || 0) - (Number(a.revenue_total) || 0)
+      );
+      const isTop = sorted[0]?.slug === marketStartupSlug;
+      return isTop ? "yes" : "no";
+    }
+    default:
+      return null;
+  }
 }

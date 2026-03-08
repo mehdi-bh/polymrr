@@ -15,7 +15,7 @@ import {
 import { Credits } from "@/components/ui/credits";
 import { XIcon } from "@/components/ui/x-icon";
 import { EditableAvatar, EditableName, EditableXHandle } from "@/components/profile/profile-settings";
-import { Trophy, Target, Calendar, Layers } from "lucide-react";
+import { Trophy, Target, Calendar, Layers, ArrowRight } from "lucide-react";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -193,6 +193,13 @@ export default async function ProfilePage({ params }: PageProps) {
                 </Link>
               ))}
             </div>
+            <Link
+              href={`/markets/create?founder=${user.xHandle}`}
+              className="btn btn-primary btn-sm gap-1.5 mt-2"
+            >
+              Bet on this founder
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </div>
       )}

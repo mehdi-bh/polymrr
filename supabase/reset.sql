@@ -139,7 +139,8 @@ create policy "Public read" on startup_snapshots for select using (true);
 create table markets (
   id uuid primary key default gen_random_uuid(),
   startup_slug text not null references startups on delete cascade,
-  type text not null check (type in ('mrr-target', 'growth-race', 'acquisition', 'survival')),
+  type text not null check (type in ('mrr-target', 'growth-race', 'acquisition', 'survival', 'founder')),
+  founder_x_handle text,
   question text not null,
   resolution_criteria text not null default '',
   resolution_config jsonb,
@@ -224,6 +225,7 @@ create index idx_bets_user on bets (user_id);
 create index idx_markets_startup on markets (startup_slug);
 create index idx_snapshots_slug_date on startup_snapshots (startup_slug, snapshot_date desc);
 create index idx_quest_completions_user on user_quest_completions (user_id);
+create index idx_markets_founder on markets (founder_x_handle) where founder_x_handle is not null;
 
 -- Immutable cast needed for index expressions (timestamptz->date depends on timezone)
 create or replace function tstz_to_date(ts timestamptz)

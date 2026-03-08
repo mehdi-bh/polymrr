@@ -13,9 +13,13 @@ import {
 import {
   METRICS,
   METRIC_DESCRIPTIONS,
+  FOUNDER_METRICS,
+  STARTUP_METRICS,
   generateQuestion,
   generateCriteria,
   generateSuggestions,
+  generateFounderSuggestions,
+  isFounderMetric,
   type MetricId,
   type ConditionId,
   type MarketBlueprint,
@@ -41,9 +45,12 @@ interface CreateMarketFormProps {
   startups: Startup[];
   user: User;
   initialStartupSlug?: string;
+  initialFounder?: {
+    xHandle: string;
+    xName: string | null;
+    startups: Startup[];
+  };
 }
-
-const METRIC_LIST = Object.values(METRICS);
 
 const CONDITION_LABELS: Record<ConditionId, string> = {
   gte: "Reach or exceed",
@@ -61,10 +68,13 @@ export function CreateMarketForm({
   startups,
   user,
   initialStartupSlug,
+  initialFounder,
 }: CreateMarketFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+
+  const isFounderMode = !!initialFounder;
 
   // Form state
   const [startupSlug, setStartupSlug] = useState(initialStartupSlug ?? "");
@@ -75,12 +85,17 @@ export function CreateMarketForm({
   const [closesAt, setClosesAt] = useState("");
   const [seedSide, setSeedSide] = useState<"yes" | "no">("yes");
   const [seedAmount, setSeedAmount] = useState("100");
+  // For founder_top_startup: which startup is being bet on
+  const [topStartupSlug, setTopStartupSlug] = useState("");
 
-  // Step: skip step 1 if startup pre-selected
-  const [step, setStep] = useState(initialStartupSlug ? 2 : 1);
+  // In founder mode, skip step 1 (startup picker) — go straight to metric
+  const [step, setStep] = useState(initialStartupSlug || isFounderMode ? 2 : 1);
 
   const selectedStartup = startups.find((s) => s.slug === startupSlug);
   const selectedMetric = metric ? METRICS[metric] : null;
+
+  // Metric list depends on mode
+  const metricList = isFounderMode ? FOUNDER_METRICS : STARTUP_METRICS;
 
   const filteredStartups = useMemo(() => {
     if (!search) return startups.slice(0, 20);
@@ -94,10 +109,12 @@ export function CreateMarketForm({
       .slice(0, 20);
   }, [startups, search]);
 
-  const suggestions = useMemo(
-    () => (selectedStartup ? generateSuggestions(selectedStartup) : []),
-    [selectedStartup]
-  );
+  const suggestions = useMemo(() => {
+    if (isFounderMode && initialFounder) {
+      return generateFounderSuggestions(initialFounder.xHandle, initialFounder.startups);
+    }
+    return selectedStartup ? generateSuggestions(selectedStartup) : [];
+  }, [isFounderMode, initialFounder, selectedStartup]);
 
   const targetNum = useMemo(() => {
     if (!selectedMetric || !target) return 0;
@@ -109,28 +126,51 @@ export function CreateMarketForm({
     return val;
   }, [selectedMetric, target]);
 
+  // For founder_top_startup, the startup_slug is the one being bet on
+  const effectiveStartupSlug = useMemo(() => {
+    if (metric === "founder_top_startup" && topStartupSlug) return topStartupSlug;
+    if (isFounderMode && initialFounder && initialFounder.startups.length > 0) {
+      // Default to top startup by revenue
+      const sorted = [...initialFounder.startups].sort((a, b) => b.revenue.total - a.revenue.total);
+      return sorted[0].slug;
+    }
+    return startupSlug;
+  }, [metric, topStartupSlug, isFounderMode, initialFounder, startupSlug]);
+
+  const effectiveStartup = useMemo(() => {
+    if (isFounderMode && initialFounder) {
+      return initialFounder.startups.find((s) => s.slug === effectiveStartupSlug) ?? initialFounder.startups[0];
+    }
+    return startups.find((s) => s.slug === effectiveStartupSlug);
+  }, [isFounderMode, initialFounder, effectiveStartupSlug, startups]);
+
   const blueprint: MarketBlueprint | null = useMemo(() => {
-    if (!startupSlug || !metric || !targetNum || !closesAt) return null;
+    if (!effectiveStartupSlug || !metric || !closesAt) return null;
+    // For non-boolean metrics, target must be > 0
+    if (selectedMetric?.unit !== "boolean" && !targetNum) return null;
+    // For boolean metrics, target must be set
+    if (selectedMetric?.unit === "boolean" && target === "") return null;
     return {
-      startupSlug,
+      startupSlug: effectiveStartupSlug,
       metric,
       condition,
       target: targetNum,
       closesAt: new Date(closesAt).toISOString(),
       seedSide,
       seedAmount: parseInt(seedAmount) || 100,
+      founderXHandle: isFounderMode ? initialFounder?.xHandle : undefined,
     };
-  }, [startupSlug, metric, condition, targetNum, closesAt, seedSide, seedAmount]);
+  }, [effectiveStartupSlug, metric, condition, targetNum, target, closesAt, seedSide, seedAmount, isFounderMode, initialFounder, selectedMetric]);
 
   const previewQuestion = useMemo(() => {
-    if (!blueprint || !selectedStartup) return null;
-    return generateQuestion(blueprint, selectedStartup.name);
-  }, [blueprint, selectedStartup]);
+    if (!blueprint || !effectiveStartup) return null;
+    return generateQuestion(blueprint, effectiveStartup.name);
+  }, [blueprint, effectiveStartup]);
 
   const previewCriteria = useMemo(() => {
-    if (!blueprint || !selectedStartup) return null;
-    return generateCriteria(blueprint, selectedStartup.name);
-  }, [blueprint, selectedStartup]);
+    if (!blueprint || !effectiveStartup) return null;
+    return generateCriteria(blueprint, effectiveStartup.name);
+  }, [blueprint, effectiveStartup]);
 
   const minDate = useMemo(() => isoDate(1), []);
   const maxDate = useMemo(() => isoDate(365), []);
@@ -139,7 +179,10 @@ export function CreateMarketForm({
     switch (step) {
       case 1: return !!startupSlug;
       case 2: return !!metric;
-      case 3: return targetNum > 0;
+      case 3: {
+        if (metric === "founder_top_startup") return !!topStartupSlug;
+        return targetNum > 0;
+      }
       case 4: return !!closesAt;
       case 5: return (parseInt(seedAmount) || 0) >= 100;
       default: return false;
@@ -154,8 +197,15 @@ export function CreateMarketForm({
       setTarget(String(s.target / 100));
     } else if (m.unit === "percent") {
       setTarget(String(s.target * 100));
+    } else if (m.unit === "boolean") {
+      setTarget(String(s.target));
     } else {
       setTarget(String(s.target));
+    }
+    // For founder_top_startup, auto-select the top startup
+    if (s.metric === "founder_top_startup" && initialFounder) {
+      const sorted = [...initialFounder.startups].sort((a, b) => b.revenue.total - a.revenue.total);
+      setTopStartupSlug(sorted[0].slug);
     }
     setClosesAt(isoDate(s.daysFromNow));
     setStep(4);
@@ -196,14 +246,28 @@ export function CreateMarketForm({
     }
   };
 
+  // Founder context card stats
+  const founderStats = useMemo(() => {
+    if (!initialFounder) return null;
+    const s = initialFounder.startups;
+    return {
+      totalRevenue: s.reduce((sum, st) => sum + st.revenue.total, 0),
+      totalMrr: s.reduce((sum, st) => sum + st.revenue.mrr, 0),
+      totalFollowers: Math.max(0, ...s.map((st) => st.xFollowerCount ?? 0)),
+      startupCount: s.length,
+    };
+  }, [initialFounder]);
+
   return (
     <TooltipProvider>
       <div className="mx-auto max-w-2xl space-y-6 animate-fade-up">
-        <h1 className="text-2xl font-bold">Create a Market</h1>
+        <h1 className="text-2xl font-bold">
+          {isFounderMode ? "Bet on a Founder" : "Create a Market"}
+        </h1>
 
         {/* Step indicator */}
         <div className="flex gap-2">
-          {[1, 2, 3, 4, 5].map((s) => (
+          {(isFounderMode ? [2, 3, 4, 5] : [1, 2, 3, 4, 5]).map((s) => (
             <div
               key={s}
               className={`h-1.5 flex-1 rounded-full transition-colors ${
@@ -213,8 +277,31 @@ export function CreateMarketForm({
           ))}
         </div>
 
-        {/* Startup context card — visible on all steps after selection */}
-        {selectedStartup && step > 1 && (
+        {/* Founder context card — visible in founder mode on all steps */}
+        {isFounderMode && initialFounder && founderStats && step >= 2 && (
+          <div className="card bg-base-200/50 border border-base-300">
+            <div className="card-body flex-row items-center gap-4 p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                {(initialFounder.xName ?? initialFounder.xHandle).slice(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold">@{initialFounder.xHandle}</div>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-base-content/50">
+                  <span className="mono-num font-semibold text-base-content/70">
+                    {formatCents(founderStats.totalRevenue)} revenue
+                  </span>
+                  <span>{founderStats.startupCount} startups</span>
+                  {founderStats.totalFollowers > 0 && (
+                    <span>{founderStats.totalFollowers.toLocaleString()} followers</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Startup context card — visible on all steps after selection (non-founder mode) */}
+        {!isFounderMode && selectedStartup && step > 1 && (
           <div className="card bg-base-200/50 border border-base-300">
             <div className="card-body flex-row items-center gap-4 p-4">
               {selectedStartup.icon ? (
@@ -274,8 +361,8 @@ export function CreateMarketForm({
           </div>
         )}
 
-        {/* Step 1 — Startup */}
-        {step === 1 && (
+        {/* Step 1 — Startup (non-founder mode only) */}
+        {!isFounderMode && step === 1 && (
           <div className="space-y-3">
             <h2 className="text-lg font-semibold">Pick a startup</h2>
             <input
@@ -310,7 +397,7 @@ export function CreateMarketForm({
         )}
 
         {/* Step 2 — Suggestions + Metric picker */}
-        {step === 2 && selectedStartup && (
+        {step === 2 && (isFounderMode || selectedStartup) && (
           <div className="space-y-5">
             {/* Suggestions */}
             {suggestions.length > 0 && (
@@ -347,7 +434,7 @@ export function CreateMarketForm({
                 </h2>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                {METRIC_LIST.map((m) => (
+                {metricList.map((m) => (
                   <button
                     key={m.id}
                     onClick={() => {
@@ -383,111 +470,179 @@ export function CreateMarketForm({
         )}
 
         {/* Step 3 — Condition & Target */}
-        {step === 3 && selectedMetric && selectedStartup && (
+        {step === 3 && selectedMetric && (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold">Set the target</h2>
 
-            {/* Current value hint */}
-            {selectedMetric.unit === "cents" && (
-              <div className="text-sm text-base-content/50">
-                Current {selectedMetric.label}:{" "}
-                <span className="mono-num font-semibold text-base-content/70">
-                  {selectedMetric.id === "mrr" && formatCents(selectedStartup.revenue.mrr)}
-                  {selectedMetric.id === "revenue_30d" && formatCents(selectedStartup.revenue.last30Days)}
-                  {selectedMetric.id === "revenue_total" && formatCents(selectedStartup.revenue.total)}
-                </span>
+            {/* founder_top_startup: show startup picker */}
+            {metric === "founder_top_startup" && initialFounder ? (
+              <div className="space-y-3">
+                <p className="text-sm text-base-content/50">
+                  Which startup will be @{initialFounder.xHandle}&apos;s #1 by revenue?
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {initialFounder.startups
+                    .sort((a, b) => b.revenue.total - a.revenue.total)
+                    .map((s) => (
+                      <button
+                        key={s.slug}
+                        onClick={() => {
+                          setTopStartupSlug(s.slug);
+                          setTarget("1");
+                          setCondition("eq");
+                        }}
+                        className={`btn btn-ghost justify-start gap-3 h-auto py-3 ${
+                          topStartupSlug === s.slug ? "btn-outline btn-primary" : ""
+                        }`}
+                      >
+                        {s.icon ? (
+                          <img src={s.icon} alt="" className="h-8 w-8 rounded" />
+                        ) : (
+                          <div className="flex h-8 w-8 items-center justify-center rounded bg-primary/10 text-xs font-bold text-primary">
+                            {s.name.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="text-left">
+                          <div className="font-semibold">{s.name}</div>
+                          <div className="text-xs text-base-content/50 mono-num">
+                            {formatCents(s.revenue.total)} total
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                </div>
               </div>
-            )}
-            {selectedMetric.unit === "count" && (
-              <div className="text-sm text-base-content/50">
-                Current {selectedMetric.label}:{" "}
-                <span className="mono-num font-semibold text-base-content/70">
-                  {selectedMetric.id === "customers" && selectedStartup.customers.toLocaleString()}
-                  {selectedMetric.id === "active_subs" && selectedStartup.activeSubscriptions.toLocaleString()}
-                </span>
-              </div>
-            )}
-            {selectedMetric.unit === "percent" && selectedMetric.id === "growth_30d" && (
-              <div className="text-sm text-base-content/50">
-                Current growth:{" "}
-                <span className="mono-num font-semibold text-base-content/70">
-                  {selectedStartup.growth30d !== null
-                    ? `${selectedStartup.growth30d.toFixed(1)}%`
-                    : "N/A"}
-                </span>
-              </div>
-            )}
-
-            {selectedMetric.unit !== "boolean" ? (
+            ) : (
               <>
-                <div className="flex gap-2">
-                  {selectedMetric.validConditions.map((c) => (
+                {/* Current value hint for founder metrics */}
+                {metric === "founder_revenue" && initialFounder && (
+                  <div className="text-sm text-base-content/50">
+                    Current total revenue:{" "}
+                    <span className="mono-num font-semibold text-base-content/70">
+                      {formatCents(initialFounder.startups.reduce((sum, s) => sum + s.revenue.total, 0))}
+                    </span>
+                  </div>
+                )}
+                {metric === "founder_startups" && initialFounder && (
+                  <div className="text-sm text-base-content/50">
+                    Current startups:{" "}
+                    <span className="mono-num font-semibold text-base-content/70">
+                      {initialFounder.startups.length}
+                    </span>
+                  </div>
+                )}
+                {metric === "founder_followers" && initialFounder && (
+                  <div className="text-sm text-base-content/50">
+                    Current X followers:{" "}
+                    <span className="mono-num font-semibold text-base-content/70">
+                      {Math.max(0, ...initialFounder.startups.map((s) => s.xFollowerCount ?? 0)).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+
+                {/* Current value hint for startup metrics */}
+                {!isFounderMode && selectedMetric.unit === "cents" && selectedStartup && (
+                  <div className="text-sm text-base-content/50">
+                    Current {selectedMetric.label}:{" "}
+                    <span className="mono-num font-semibold text-base-content/70">
+                      {selectedMetric.id === "mrr" && formatCents(selectedStartup.revenue.mrr)}
+                      {selectedMetric.id === "revenue_30d" && formatCents(selectedStartup.revenue.last30Days)}
+                      {selectedMetric.id === "revenue_total" && formatCents(selectedStartup.revenue.total)}
+                    </span>
+                  </div>
+                )}
+                {!isFounderMode && selectedMetric.unit === "count" && selectedStartup && (
+                  <div className="text-sm text-base-content/50">
+                    Current {selectedMetric.label}:{" "}
+                    <span className="mono-num font-semibold text-base-content/70">
+                      {selectedMetric.id === "customers" && selectedStartup.customers.toLocaleString()}
+                      {selectedMetric.id === "active_subs" && selectedStartup.activeSubscriptions.toLocaleString()}
+                    </span>
+                  </div>
+                )}
+                {!isFounderMode && selectedMetric.unit === "percent" && selectedMetric.id === "growth_30d" && selectedStartup && (
+                  <div className="text-sm text-base-content/50">
+                    Current growth:{" "}
+                    <span className="mono-num font-semibold text-base-content/70">
+                      {selectedStartup.growth30d !== null
+                        ? `${selectedStartup.growth30d.toFixed(1)}%`
+                        : "N/A"}
+                    </span>
+                  </div>
+                )}
+
+                {selectedMetric.unit !== "boolean" ? (
+                  <>
+                    <div className="flex gap-2">
+                      {selectedMetric.validConditions.map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => setCondition(c)}
+                          className={`btn btn-sm flex-1 ${
+                            condition === c
+                              ? "btn-primary"
+                              : "btn-ghost border-base-300"
+                          }`}
+                        >
+                          {CONDITION_LABELS[c]}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="relative">
+                      {selectedMetric.unit === "cents" && (
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50">
+                          $
+                        </span>
+                      )}
+                      <input
+                        type="number"
+                        placeholder={
+                          selectedMetric.unit === "cents"
+                            ? "e.g. 5000"
+                            : selectedMetric.unit === "percent"
+                            ? "e.g. 20"
+                            : "e.g. 100"
+                        }
+                        value={target}
+                        onChange={(e) => setTarget(e.target.value)}
+                        className={`input input-bordered w-full bg-base-200 mono-num ${
+                          selectedMetric.unit === "cents" ? "pl-7" : ""
+                        }`}
+                      />
+                      {selectedMetric.unit === "percent" && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/50">
+                          %
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : selectedMetric.id === "on_sale" ? (
+                  <div className="flex gap-2">
                     <button
-                      key={c}
-                      onClick={() => setCondition(c)}
-                      className={`btn btn-sm flex-1 ${
-                        condition === c
-                          ? "btn-primary"
-                          : "btn-ghost border-base-300"
+                      onClick={() => {
+                        setTarget("1");
+                        setCondition("eq");
+                      }}
+                      className={`btn flex-1 ${
+                        target === "1" ? "btn-primary" : "btn-ghost border-base-300"
                       }`}
                     >
-                      {CONDITION_LABELS[c]}
+                      Yes (listed for sale)
                     </button>
-                  ))}
-                </div>
-                <div className="relative">
-                  {selectedMetric.unit === "cents" && (
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50">
-                      $
-                    </span>
-                  )}
-                  <input
-                    type="number"
-                    placeholder={
-                      selectedMetric.unit === "cents"
-                        ? "e.g. 5000"
-                        : selectedMetric.unit === "percent"
-                        ? "e.g. 20"
-                        : "e.g. 100"
-                    }
-                    value={target}
-                    onChange={(e) => setTarget(e.target.value)}
-                    className={`input input-bordered w-full bg-base-200 mono-num ${
-                      selectedMetric.unit === "cents" ? "pl-7" : ""
-                    }`}
-                  />
-                  {selectedMetric.unit === "percent" && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/50">
-                      %
-                    </span>
-                  )}
-                </div>
+                    <button
+                      onClick={() => {
+                        setTarget("0");
+                        setCondition("eq");
+                      }}
+                      className={`btn flex-1 ${
+                        target === "0" ? "btn-primary" : "btn-ghost border-base-300"
+                      }`}
+                    >
+                      No (not for sale)
+                    </button>
+                  </div>
+                ) : null}
               </>
-            ) : (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setTarget("1");
-                    setCondition("eq");
-                  }}
-                  className={`btn flex-1 ${
-                    target === "1" ? "btn-primary" : "btn-ghost border-base-300"
-                  }`}
-                >
-                  Yes (listed for sale)
-                </button>
-                <button
-                  onClick={() => {
-                    setTarget("0");
-                    setCondition("eq");
-                  }}
-                  className={`btn flex-1 ${
-                    target === "0" ? "btn-primary" : "btn-ghost border-base-300"
-                  }`}
-                >
-                  No (not for sale)
-                </button>
-              </div>
             )}
           </div>
         )}
@@ -586,7 +741,7 @@ export function CreateMarketForm({
 
         {/* Navigation */}
         <div className="flex gap-3">
-          {step > 1 && (
+          {step > (isFounderMode ? 2 : 1) && (
             <button
               onClick={() => setStep(step - 1)}
               className="btn btn-ghost gap-1"

@@ -7,6 +7,7 @@ import {
   generateQuestion,
   generateCriteria,
   buildResolutionConfig,
+  isFounderMetric,
   METRICS,
   type MarketBlueprint,
 } from "@/lib/market-templates";
@@ -37,6 +38,18 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
+
+  // For founder markets, verify founder exists in startup_cofounders
+  if (isFounderMetric(blueprint.metric) && blueprint.founderXHandle) {
+    const { data: cofRows } = await admin
+      .from("startup_cofounders")
+      .select("x_handle")
+      .eq("x_handle", blueprint.founderXHandle)
+      .limit(1);
+    if (!cofRows || cofRows.length === 0) {
+      return NextResponse.json({ error: "Founder not found" }, { status: 404 });
+    }
+  }
 
   // Verify startup exists
   const { data: startup } = await admin
@@ -90,6 +103,7 @@ export async function POST(request: Request) {
       total_bettors: 0,
       closes_at: blueprint.closesAt,
       created_by: user.id,
+      founder_x_handle: blueprint.founderXHandle ?? null,
     })
     .select("id")
     .single();

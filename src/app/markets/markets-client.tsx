@@ -24,6 +24,7 @@ const typeOptions: FilterOption[] = [
   { value: "growth-race", label: "Growth", icon: <TrendingUp /> },
   { value: "acquisition", label: "Acquisition", icon: <Handshake /> },
   { value: "survival", label: "Survival", icon: <HeartPulse /> },
+  { value: "founder", label: "Founder", icon: <Flame /> },
 ];
 
 const sortOptions: FilterOption[] = [
