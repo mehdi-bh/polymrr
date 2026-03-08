@@ -31,18 +31,19 @@ async function main() {
     .limit(1)
     .maybeSingle();
 
-  const prev = lastRun?.details as { synced?: number; page?: number; lines?: string[] } | null;
-  const resuming = lastRun && (lastRun.status === "running" || lastRun.status === "failed") && prev?.page;
+  const prev = lastRun?.details as { synced?: number; page?: number; total?: number; lines?: string[] } | null;
+  const canResume = lastRun && (lastRun.status === "running" || lastRun.status === "failed") && (prev?.synced ?? 0) > 0;
 
   let logId: number | null;
   let synced: number;
   let page: number;
   let lines: string[];
 
-  if (resuming) {
+  if (canResume) {
     logId = lastRun!.id;
     synced = prev!.synced ?? 0;
-    page = prev!.page ?? 1;
+    // Derive page from synced count if page wasn't saved
+    page = prev!.page ?? Math.floor(synced / PAGE_SIZE) + 1;
     lines = prev!.lines ?? [];
     console.log(`[sync-startups] Resuming from page ${page} (${synced} already synced)`);
     await updateSyncLog(admin, logId!, "running", { ...prev, resumed_at: new Date().toISOString() });
