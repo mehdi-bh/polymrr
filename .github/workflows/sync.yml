@@ -1,10 +1,12 @@
-name: Sync Crons
+name: Cron Jobs
 
 on:
   # schedule:
   #   - cron: "*/30 * * * *" # sync-frequent
   #   - cron: "0 2 * * *"    # sync-daily
   #   - cron: "0 3 * * *"    # scrape-mrr
+  #   - cron: "0 4 * * *"    # generate-markets
+  #   - cron: "0 0 * * *"    # resolve-markets
   workflow_dispatch:
     inputs:
       job:
@@ -16,6 +18,8 @@ on:
           - sync-frequent
           - scrape-mrr
           - sync-startups
+          - generate-markets
+          - resolve-markets
 
 env:
   NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -30,9 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+        with: { node-version: 20, cache: npm }
       - run: npm ci
       - run: npx tsx scripts/sync-frequent.ts
 
@@ -43,9 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+        with: { node-version: 20, cache: npm }
       - run: npm ci
       - run: npx tsx scripts/sync-daily.ts
 
@@ -56,11 +56,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+        with: { node-version: 20, cache: npm }
       - run: npm ci
       - run: npx tsx scripts/scrape-mrr.ts
+
+  generate-markets:
+    if: github.event.schedule == '0 4 * * *' || (github.event_name == 'workflow_dispatch' && inputs.job == 'generate-markets')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npx tsx scripts/generate-markets.ts
+
+  resolve-markets:
+    if: github.event.schedule == '0 0 * * *' || (github.event_name == 'workflow_dispatch' && inputs.job == 'resolve-markets')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npx tsx scripts/resolve-markets.ts
 
   sync-startups:
     if: github.event_name == 'workflow_dispatch' && inputs.job == 'sync-startups'
@@ -69,8 +89,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+        with: { node-version: 20, cache: npm }
       - run: npm ci
       - run: npx tsx scripts/sync-startups.ts

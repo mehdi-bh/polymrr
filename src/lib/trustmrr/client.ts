@@ -1,69 +1,92 @@
 /**
- * TrustMRR API client with built-in rate limiting.
+ * TrustMRR API client with multi-key round-robin rate limiting.
  *
- * Respects server rate-limit headers (x-ratelimit-remaining, x-ratelimit-reset, retry-after)
- * and enforces a local sliding window as a safety net.
+ * Set TRUSTMRR_API_KEY to a comma-separated list of keys for parallel throughput.
+ * Each key gets its own rate limit window (20 req/min default).
  */
 
 const BASE_URL = "https://trustmrr.com/api/v1";
+const RATE_LIMIT_PER_KEY = parseInt(process.env.TRUSTMRR_RATE_LIMIT ?? "20", 10);
+const WINDOW_MS = 60_000;
+const MAX_RETRIES = 3;
+
+// ---------------------------------------------------------------------------
+// Key pool
+// ---------------------------------------------------------------------------
+
+interface KeySlot {
+  key: string;
+  timestamps: number[];
+  pauseUntil: number | null;
+}
+
+const API_KEYS = (process.env.TRUSTMRR_API_KEY ?? "")
+  .split(",")
+  .map((k) => k.trim())
+  .filter(Boolean);
+
+if (API_KEYS.length === 0 && typeof process !== "undefined") {
+  console.warn("[trustmrr] No API keys configured");
+}
+
+const slots: KeySlot[] = API_KEYS.map((key) => ({
+  key,
+  timestamps: [],
+  pauseUntil: null,
+}));
+
+let robin = 0;
 
 // ---------------------------------------------------------------------------
 // Rate limiter
 // ---------------------------------------------------------------------------
 
-const LOCAL_RATE_LIMIT = parseInt(process.env.TRUSTMRR_RATE_LIMIT ?? "20", 10);
-const WINDOW_MS = 60_000;
-const MAX_RETRIES = 3;
-
-let requestTimestamps: number[] = [];
-let pauseUntil: number | null = null;
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, Math.min(ms, 120_000)));
+}
 
 function parseResetTimestamp(value: string): number | null {
   const num = parseInt(value, 10);
   if (isNaN(num)) return null;
-  // If it looks like a unix timestamp in seconds (reasonable range: 2020-2040)
-  if (num > 1_577_836_800 && num < 2_524_608_000) {
-    return num * 1000;
-  }
-  // If it's already in milliseconds (> year 2020 in ms)
-  if (num > 1_577_836_800_000) {
-    return num;
-  }
-  // Otherwise treat as seconds-from-now
+  if (num > 1_577_836_800 && num < 2_524_608_000) return num * 1000;
+  if (num > 1_577_836_800_000) return num;
   return Date.now() + num * 1000;
 }
 
-function sleep(ms: number): Promise<void> {
-  // Clamp to avoid Node.js 32-bit overflow warning
-  return new Promise((r) => setTimeout(r, Math.min(ms, 120_000)));
+async function acquireSlot(): Promise<KeySlot> {
+  while (true) {
+    const now = Date.now();
+
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[(robin + i) % slots.length];
+
+      if (slot.pauseUntil && now < slot.pauseUntil) continue;
+      slot.pauseUntil = null;
+
+      slot.timestamps = slot.timestamps.filter((t) => now - t < WINDOW_MS);
+      if (slot.timestamps.length < RATE_LIMIT_PER_KEY) {
+        slot.timestamps.push(now);
+        robin = ((robin + i + 1) % slots.length);
+        return slot;
+      }
+    }
+
+    // All keys exhausted — wait for the earliest opening
+    let minWait = WINDOW_MS;
+    for (const slot of slots) {
+      if (slot.pauseUntil && slot.pauseUntil > now) {
+        minWait = Math.min(minWait, slot.pauseUntil - now);
+      } else if (slot.timestamps.length > 0) {
+        minWait = Math.min(minWait, WINDOW_MS - (now - slot.timestamps[0]));
+      }
+    }
+
+    console.log(`[trustmrr] All ${slots.length} key(s) busy, waiting ${Math.round(minWait / 1000)}s`);
+    await sleep(minWait + 200);
+  }
 }
 
-async function waitForSlot(): Promise<void> {
-  // Respect server-imposed pause
-  if (pauseUntil && Date.now() < pauseUntil) {
-    const wait = pauseUntil - Date.now() + 200;
-    console.log(`[trustmrr] Waiting ${Math.round(wait / 1000)}s for rate limit reset`);
-    await sleep(wait);
-    pauseUntil = null;
-    requestTimestamps = [];
-  }
-
-  // Local sliding window
-  const now = Date.now();
-  requestTimestamps = requestTimestamps.filter((t) => now - t < WINDOW_MS);
-
-  if (requestTimestamps.length >= LOCAL_RATE_LIMIT) {
-    const oldest = requestTimestamps[0];
-    const wait = WINDOW_MS - (now - oldest) + 200;
-    console.log(`[trustmrr] Local rate limit (${LOCAL_RATE_LIMIT}/min), waiting ${Math.round(wait / 1000)}s`);
-    await sleep(wait);
-    requestTimestamps = requestTimestamps.filter((t) => Date.now() - t < WINDOW_MS);
-  }
-
-  requestTimestamps.push(Date.now());
-}
-
-function readRateLimitHeaders(res: Response): void {
+function handleRateLimitHeaders(res: Response, slot: KeySlot): void {
   const remaining = res.headers.get("x-ratelimit-remaining");
   const reset = res.headers.get("x-ratelimit-reset");
   const retryAfter = res.headers.get("retry-after");
@@ -73,8 +96,7 @@ function readRateLimitHeaders(res: Response): void {
     if (rem <= 1 && reset) {
       const resetAt = parseResetTimestamp(reset);
       if (resetAt && resetAt > Date.now()) {
-        pauseUntil = resetAt;
-        console.log(`[trustmrr] ${rem} requests remaining, will pause until reset (${Math.round((resetAt - Date.now()) / 1000)}s)`);
+        slot.pauseUntil = resetAt;
       }
     }
   }
@@ -82,30 +104,26 @@ function readRateLimitHeaders(res: Response): void {
   if (retryAfter) {
     const resetAt = parseResetTimestamp(retryAfter);
     if (resetAt && resetAt > Date.now()) {
-      pauseUntil = resetAt;
+      slot.pauseUntil = resetAt;
     }
   }
 }
 
 // ---------------------------------------------------------------------------
-// API helpers
+// API fetch
 // ---------------------------------------------------------------------------
 
-function authHeaders(): HeadersInit {
-  return { Authorization: `Bearer ${process.env.TRUSTMRR_API_KEY}` };
-}
-
 async function apiFetch(url: string, attempt = 0): Promise<Response> {
-  await waitForSlot();
+  const slot = await acquireSlot();
 
   const res = await fetch(url, {
-    headers: authHeaders(),
+    headers: { Authorization: `Bearer ${slot.key}` },
     cache: "no-store",
   });
-  readRateLimitHeaders(res);
 
-  // Retryable errors: 429, 508, 502, 503, 504
-  if (res.status === 429 || res.status === 508 || res.status === 502 || res.status === 503 || res.status === 504) {
+  handleRateLimitHeaders(res, slot);
+
+  if ([429, 502, 503, 504, 508].includes(res.status)) {
     if (attempt >= MAX_RETRIES) {
       throw new Error(`TrustMRR API ${res.status} after ${MAX_RETRIES} retries — ${url}`);
     }
@@ -117,9 +135,9 @@ async function apiFetch(url: string, attempt = 0): Promise<Response> {
       if (resetAt) wait = Math.max(resetAt - Date.now(), 1000);
     }
 
-    console.log(`[trustmrr] ${res.status} ${res.statusText} (attempt ${attempt + 1}/${MAX_RETRIES}), waiting ${Math.round(wait / 1000)}s`);
+    console.log(`[trustmrr] ${res.status} (attempt ${attempt + 1}/${MAX_RETRIES}), waiting ${Math.round(wait / 1000)}s`);
     await sleep(wait);
-    if (res.status === 429) requestTimestamps = [];
+    if (res.status === 429) slot.timestamps = [];
     return apiFetch(url, attempt + 1);
   }
 
@@ -139,7 +157,6 @@ export interface TrustMRRListResponse {
   meta: { total: number; page: number; limit: number; hasMore: boolean };
 }
 
-/** Fields returned by the list endpoint (truncated description, no techStack/cofounders) */
 export interface TrustMRRListItem {
   name: string;
   slug: string;
@@ -163,7 +180,6 @@ export interface TrustMRRListItem {
   xHandle: string | null;
 }
 
-/** Full detail response — includes techStack, cofounders, xFollowerCount, isMerchantOfRecord */
 export interface TrustMRRDetail extends TrustMRRListItem {
   xFollowerCount: number | null;
   isMerchantOfRecord: boolean;
@@ -189,21 +205,4 @@ export async function getStartupDetail(slug: string): Promise<TrustMRRDetail> {
   const res = await apiFetch(`${BASE_URL}/startups/${encodeURIComponent(slug)}`);
   const { data } = await res.json();
   return data;
-}
-
-/** Paginate through all startups on the list endpoint */
-export async function fetchAllSlugs(): Promise<TrustMRRListItem[]> {
-  const all: TrustMRRListItem[] = [];
-  let page = 1;
-  let hasMore = true;
-
-  while (hasMore) {
-    const res = await listStartups({ page, limit: 50, sort: "revenue-desc" });
-    all.push(...res.data);
-    console.log(`[trustmrr] fetchAllSlugs page ${page}: +${res.data.length} (total: ${all.length}/${res.meta.total})`);
-    hasMore = res.meta.hasMore;
-    page++;
-  }
-
-  return all;
 }

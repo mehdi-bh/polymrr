@@ -41,7 +41,6 @@ async function main() {
 
     while (hasMore) {
       if (logId && await isCancelled(admin, logId)) {
-        console.log("[sync-daily] Cancelled");
         lines = await updateProgress(admin, logId, synced, total, "Cancelled by user", lines);
         break;
       }
@@ -54,28 +53,18 @@ async function main() {
 
       for (const item of listRes.data) {
         try {
-          const isNew = !existingSlugs.has(item.slug);
-
-          if (isNew) {
+          if (!existingSlugs.has(item.slug)) {
             const detail = await getStartupDetail(item.slug);
             await upsertStartup(admin, detail);
             await storeSnapshot(admin, detail);
             existingSlugs.add(item.slug);
             newCount++;
-            synced++;
-            if (logId) lines = await updateProgress(admin, logId, synced, total, `${synced}/${total} ${item.slug} NEW`, lines);
           } else {
             await upsertStartupFromList(admin, item);
-            await storeSnapshot(admin, {
-              ...item,
-              xFollowerCount: null,
-              isMerchantOfRecord: false,
-              techStack: [],
-              cofounders: [],
-            });
-            synced++;
-            if (logId) lines = await updateProgress(admin, logId, synced, total, null, lines);
+            await storeSnapshot(admin, { ...item, xFollowerCount: null, isMerchantOfRecord: false, techStack: [], cofounders: [] });
           }
+          synced++;
+          if (logId) lines = await updateProgress(admin, logId, synced, total, null, lines);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           errors.push(`${item.slug}: ${msg}`);
@@ -84,9 +73,8 @@ async function main() {
         }
       }
 
-      if (page % 5 === 0) {
-        console.log(`[sync-daily] ${synced}/${total} synced (${newCount} new)`);
-        if (logId) lines = await updateProgress(admin, logId, synced, total, `${synced}/${total} synced (${newCount} new)`, lines);
+      if (page % 5 === 0 && logId) {
+        lines = await updateProgress(admin, logId, synced, total, `${synced}/${total} synced (${newCount} new)`, lines);
       }
 
       page++;
@@ -96,9 +84,7 @@ async function main() {
 
     if (logId) {
       await updateSyncLog(admin, logId, "completed", {
-        synced,
-        new_startups: newCount,
-        total,
+        synced, new_startups: newCount, total,
         errors: errors.length > 0 ? errors.slice(0, 20) : undefined,
         completed_at: new Date().toISOString(),
       });
@@ -107,12 +93,7 @@ async function main() {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[sync-daily] Fatal: ${msg}`);
     if (logId) {
-      await updateSyncLog(admin, logId, "failed", {
-        error: msg,
-        synced,
-        new_startups: newCount,
-        completed_at: new Date().toISOString(),
-      });
+      await updateSyncLog(admin, logId, "failed", { error: msg, synced, completed_at: new Date().toISOString() });
     }
     process.exit(1);
   }

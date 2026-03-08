@@ -28,44 +28,30 @@ async function main() {
     const stale = allStartups.filter((s) => scraped.has(s.slug));
     const toScrape = [...neverScraped, ...stale];
 
-    console.log(`[scrape-mrr] ${neverScraped.length} new, ${stale.length} stale, scraping ${toScrape.length}`);
-
     let succeeded = 0;
     let processed = 0;
     const errors: string[] = [];
     let lines: string[] = [];
 
-    if (logId) {
-      lines = await updateProgress(admin, logId, 0, toScrape.length, `${neverScraped.length} new, ${stale.length} stale`, lines);
-    }
+    if (logId) lines = await updateProgress(admin, logId, 0, toScrape.length, `${neverScraped.length} new, ${stale.length} stale`, lines);
 
     for (const { slug } of toScrape) {
-      if (logId && await isCancelled(admin, logId)) {
-        console.log("[scrape-mrr] Cancelled");
-        lines = await updateProgress(admin, logId, processed, toScrape.length, "Cancelled by user", lines);
-        break;
-      }
+      if (logId && await isCancelled(admin, logId)) break;
 
       processed++;
       try {
         const points = await scrapeMrrHistory(slug);
-
         if (points && points.length > 0) {
           await storeMrrHistory(admin, slug, points);
           succeeded++;
-          const line = `${processed}/${toScrape.length} ${slug}: ${points.length} months`;
-          console.log(`[scrape-mrr] ${line}`);
-          if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, line, lines);
+          if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, `${processed}/${toScrape.length} ${slug}: ${points.length} months`, lines);
         } else {
-          const line = `${processed}/${toScrape.length} ${slug}: no data`;
-          if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, line, lines);
+          if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, `${processed}/${toScrape.length} ${slug}: no data`, lines);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        const line = `${processed}/${toScrape.length} ${slug}: FAILED ${msg}`;
-        console.error(`[scrape-mrr] ${line}`);
         errors.push(`${slug}: ${msg}`);
-        if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, line, lines);
+        if (logId) lines = await updateProgress(admin, logId, processed, toScrape.length, `${processed}/${toScrape.length} ${slug}: FAILED ${msg}`, lines);
       }
 
       await new Promise((r) => setTimeout(r, DELAY_MS));
@@ -75,8 +61,7 @@ async function main() {
 
     if (logId) {
       await updateSyncLog(admin, logId, "completed", {
-        total: toScrape.length,
-        succeeded,
+        total: toScrape.length, succeeded,
         errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
         completed_at: new Date().toISOString(),
       });
@@ -85,10 +70,7 @@ async function main() {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[scrape-mrr] Fatal: ${msg}`);
     if (logId) {
-      await updateSyncLog(admin, logId, "failed", {
-        error: msg,
-        completed_at: new Date().toISOString(),
-      });
+      await updateSyncLog(admin, logId, "failed", { error: msg, completed_at: new Date().toISOString() });
     }
     process.exit(1);
   }
