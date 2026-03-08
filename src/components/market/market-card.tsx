@@ -1,8 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { OddsBar } from "./odds-bar";
 import { daysUntil, formatCents } from "@/lib/helpers";
 import { Credits } from "@/components/ui/credits";
 import { ShareMarketButton } from "./share-market-button";
+import { FounderAvatar } from "@/components/founder/founder-avatar";
+import { XIcon } from "@/components/ui/x-icon";
 import type { Market, Startup } from "@/lib/types";
 import { Clock, Users } from "lucide-react";
 
@@ -14,6 +18,7 @@ interface MarketCardProps {
 export function MarketCard({ market, startup }: MarketCardProps) {
   const days = daysUntil(market.closesAt);
   const closingSoon = days <= 10;
+  const isFounderMarket = market.type === "founder" && market.founderXHandle;
 
   return (
     <Link
@@ -23,19 +28,33 @@ export function MarketCard({ market, startup }: MarketCardProps) {
       <div className="card-body gap-3 p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            {startup.icon ? (
-              <img src={startup.icon} alt={startup.name} className="h-9 w-9 rounded-lg object-cover" />
+            {isFounderMarket ? (
+              <>
+                <FounderAvatar
+                  xHandle={market.founderXHandle!}
+                  name={market.founderXHandle!}
+                  size={36}
+                />
+                <span className="text-sm font-semibold">@{market.founderXHandle}</span>
+                <XIcon size={12} className="text-base-content/50" />
+              </>
             ) : (
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
-                {startup.name.slice(0, 2).toUpperCase()}
-              </div>
+              <>
+                {startup.icon ? (
+                  <img src={startup.icon} alt={startup.name} className="h-9 w-9 rounded-lg object-cover" />
+                ) : (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                    {startup.name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <span className="text-sm font-semibold">{startup.name}</span>
+                  <span className="mono-num ml-2 text-xs text-base-content/50">
+                    {formatCents(startup.revenue.mrr)}
+                  </span>
+                </div>
+              </>
             )}
-            <div>
-              <span className="text-sm font-semibold">{startup.name}</span>
-              <span className="mono-num ml-2 text-xs text-base-content/50">
-                {formatCents(startup.revenue.mrr)}
-              </span>
-            </div>
           </div>
           <div className="flex gap-1.5">
             {startup.onSale && (

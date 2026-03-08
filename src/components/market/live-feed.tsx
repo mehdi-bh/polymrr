@@ -11,15 +11,15 @@ interface LiveFeedProps {
 
 export function LiveFeed({ items }: LiveFeedProps) {
   return (
-    <div className="card bg-base-100 border border-base-300 overflow-hidden">
-      <div className="flex items-center gap-2 border-b border-base-300 px-5 py-3">
+    <div className="space-y-4">
+      <h2 className="flex items-center gap-2 text-lg font-bold">
         <span className="relative flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
         </span>
-        <span className="text-xs font-bold uppercase tracking-wider text-base-content/50">Live Feed</span>
-      </div>
-
+        Live Feed
+      </h2>
+      <div className="card bg-base-100 border border-base-300 overflow-hidden">
       <div className="divide-y divide-base-300/50">
         {items.map((item) => (
           <Link
@@ -46,6 +46,7 @@ export function LiveFeed({ items }: LiveFeedProps) {
             </div>
           </Link>
         ))}
+      </div>
       </div>
     </div>
   );

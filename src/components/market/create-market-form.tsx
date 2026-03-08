@@ -341,9 +341,11 @@ export function CreateMarketForm({
         {isFounderMode && initialFounder && founderStats && step >= 2 && (
           <div className="card bg-base-200/50 border border-base-300">
             <div className="card-body flex-row items-center gap-4 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                {(initialFounder.xName ?? initialFounder.xHandle).slice(0, 2).toUpperCase()}
-              </div>
+              <FounderAvatar
+                xHandle={initialFounder.xHandle}
+                name={initialFounder.xName ?? initialFounder.xHandle}
+                size={40}
+              />
               <div className="flex-1 min-w-0">
                 <div className="font-semibold">@{initialFounder.xHandle}</div>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-base-content/50">
@@ -488,110 +490,87 @@ export function CreateMarketForm({
               </div>
             )}
 
+            {/* Pagination — above grids */}
+            {pickerReadyTab === pickerTab && pickerPageCount > 1 && (
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => setPickerPage(pickerPage - 1)}
+                  disabled={pickerPage <= 1}
+                  className="btn btn-ghost btn-sm gap-1"
+                >
+                  <ChevronLeft className="h-4 w-4" /> Prev
+                </button>
+                <span className="text-xs text-base-content/50 mono-num">
+                  {pickerPage} / {pickerPageCount}
+                </span>
+                <button
+                  onClick={() => setPickerPage(pickerPage + 1)}
+                  disabled={pickerPage >= pickerPageCount}
+                  className="btn btn-ghost btn-sm gap-1"
+                >
+                  Next <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
             {/* Startups grid */}
             {pickerReadyTab === pickerTab && pickerTab === "startups" && (
-              <>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {pickerStartups.map((s) => {
-                    const mc = getMarketsForSlug(s.slug).length;
-                    return (
-                      <button
-                        key={s.slug}
-                        onClick={() => setStartupSlug(s.slug)}
-                        className={`btn btn-ghost justify-start gap-3 h-auto py-3 ${
-                          startupSlug === s.slug ? "btn-outline btn-primary" : ""
-                        }`}
-                      >
-                        {s.icon && (
-                          <img src={s.icon} alt="" className="h-8 w-8 rounded" />
-                        )}
-                        <div className="flex-1 text-left">
-                          <div className="font-semibold">{s.name}</div>
-                          <div className="text-xs text-base-content/50">
-                            {formatCents(s.mrr)} MRR
-                          </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {pickerStartups.map((s) => {
+                  const mc = getMarketsForSlug(s.slug).length;
+                  return (
+                    <button
+                      key={s.slug}
+                      onClick={() => setStartupSlug(s.slug)}
+                      className={`btn btn-ghost justify-start gap-3 h-auto py-3 ${
+                        startupSlug === s.slug ? "btn-outline btn-primary" : ""
+                      }`}
+                    >
+                      {s.icon && (
+                        <img src={s.icon} alt="" className="h-8 w-8 rounded" />
+                      )}
+                      <div className="flex-1 text-left">
+                        <div className="font-semibold">{s.name}</div>
+                        <div className="text-xs text-base-content/50">
+                          {formatCents(s.mrr)} MRR
                         </div>
-                        {mc > 0 && (
-                          <span className="badge badge-sm badge-primary badge-outline mono-num">
-                            {mc}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-                {pickerPageCount > 1 && (
-                  <div className="flex items-center justify-between pt-1">
-                    <button
-                      onClick={() => setPickerPage(pickerPage - 1)}
-                      disabled={pickerPage <= 1}
-                      className="btn btn-ghost btn-sm gap-1"
-                    >
-                      <ChevronLeft className="h-4 w-4" /> Prev
+                      </div>
+                      {mc > 0 && (
+                        <span className="badge badge-sm badge-primary badge-outline mono-num">
+                          {mc}
+                        </span>
+                      )}
                     </button>
-                    <span className="text-xs text-base-content/50 mono-num">
-                      {pickerPage} / {pickerPageCount}
-                    </span>
-                    <button
-                      onClick={() => setPickerPage(pickerPage + 1)}
-                      disabled={pickerPage >= pickerPageCount}
-                      className="btn btn-ghost btn-sm gap-1"
-                    >
-                      Next <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-              </>
+                  );
+                })}
+              </div>
             )}
 
             {/* Founders grid */}
             {pickerReadyTab === pickerTab && pickerTab === "founders" && (
-              <>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {pickerFounders.map((f) => (
-                    <Link
-                      key={f.xHandle}
-                      href={`/markets/create?founder=${f.xHandle}`}
-                      className="btn btn-ghost justify-start gap-3 h-auto py-3"
-                    >
-                      <FounderAvatar
-                        xHandle={f.xHandle}
-                        name={f.xName ?? f.xHandle}
-                        size={32}
-                      />
-                      <div className="flex-1 text-left">
-                        <div className="font-semibold">@{f.xHandle}</div>
-                        <div className="text-xs text-base-content/50">
-                          {f.totalFollowers > 0
-                            ? `${f.totalFollowers.toLocaleString()} followers`
-                            : `${f.startupCount} startup${f.startupCount !== 1 ? "s" : ""}`}
-                        </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {pickerFounders.map((f) => (
+                  <Link
+                    key={f.xHandle}
+                    href={`/markets/create?founder=${f.xHandle}`}
+                    className="btn btn-ghost justify-start gap-3 h-auto py-3"
+                  >
+                    <FounderAvatar
+                      xHandle={f.xHandle}
+                      name={f.xName ?? f.xHandle}
+                      size={32}
+                    />
+                    <div className="flex-1 text-left">
+                      <div className="font-semibold">@{f.xHandle}</div>
+                      <div className="text-xs text-base-content/50">
+                        {f.totalFollowers > 0
+                          ? `${f.totalFollowers.toLocaleString()} followers`
+                          : `${f.startupCount} startup${f.startupCount !== 1 ? "s" : ""}`}
                       </div>
-                    </Link>
-                  ))}
-                </div>
-                {pickerPageCount > 1 && (
-                  <div className="flex items-center justify-between pt-1">
-                    <button
-                      onClick={() => setPickerPage(pickerPage - 1)}
-                      disabled={pickerPage <= 1}
-                      className="btn btn-ghost btn-sm gap-1"
-                    >
-                      <ChevronLeft className="h-4 w-4" /> Prev
-                    </button>
-                    <span className="text-xs text-base-content/50 mono-num">
-                      {pickerPage} / {pickerPageCount}
-                    </span>
-                    <button
-                      onClick={() => setPickerPage(pickerPage + 1)}
-                      disabled={pickerPage >= pickerPageCount}
-                      className="btn btn-ghost btn-sm gap-1"
-                    >
-                      Next <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-              </>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             )}
           </div>
         )}

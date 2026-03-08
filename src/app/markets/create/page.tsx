@@ -39,6 +39,7 @@ export default async function CreateMarketPage({ searchParams }: PageProps) {
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <CreateMarketForm
+        key={initialFounder?.xHandle ?? initialStartupSlug ?? "picker"}
         startups={startups}
         user={user}
         initialStartupSlug={initialStartupSlug}

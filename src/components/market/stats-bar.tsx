@@ -13,7 +13,7 @@ export async function StatsBar() {
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
       {items.map((item) => (
-        <div key={item.label} className="rounded-xl border border-base-300 bg-base-100 px-5 py-4 text-center">
+        <div key={item.label} className="rounded-xl border border-primary/30 bg-base-100 px-5 py-4 text-center">
           <div className="mono-num text-2xl font-bold">{item.value}</div>
           <div className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-base-content/50">{item.label}</div>
         </div>
