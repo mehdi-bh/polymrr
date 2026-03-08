@@ -40,12 +40,12 @@ async function main() {
   let lines: string[];
 
   if (resuming) {
-    logId = lastRun.id;
+    logId = lastRun!.id;
     synced = prev!.synced ?? 0;
     page = prev!.page ?? 1;
     lines = prev!.lines ?? [];
     console.log(`[sync-startups] Resuming from page ${page} (${synced} already synced)`);
-    await updateSyncLog(admin, logId, "running", { ...prev, resumed_at: new Date().toISOString() });
+    await updateSyncLog(admin, logId!, "running", { ...prev, resumed_at: new Date().toISOString() });
   } else {
     logId = await logSync(admin, "trustmrr_full_daily", "running");
     synced = 0;
