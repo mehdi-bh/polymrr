@@ -21,16 +21,43 @@ const PAGE_SIZE = 50;
 
 async function main() {
   const admin = createAdminClient();
-  const logId = await logSync(admin, "trustmrr_full_daily", "running");
 
-  let synced = 0;
-  let page = 1;
+  // Auto-resume: check if there's an incomplete run to continue from
+  const { data: lastRun } = await admin
+    .from("sync_log")
+    .select("id, status, details")
+    .eq("source", "trustmrr_full_daily")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const prev = lastRun?.details as { synced?: number; page?: number; lines?: string[] } | null;
+  const resuming = lastRun && (lastRun.status === "running" || lastRun.status === "failed") && prev?.page;
+
+  let logId: number | null;
+  let synced: number;
+  let page: number;
+  let lines: string[];
+
+  if (resuming) {
+    logId = lastRun.id;
+    synced = prev!.synced ?? 0;
+    page = prev!.page ?? 1;
+    lines = prev!.lines ?? [];
+    console.log(`[sync-startups] Resuming from page ${page} (${synced} already synced)`);
+    await updateSyncLog(admin, logId, "running", { ...prev, resumed_at: new Date().toISOString() });
+  } else {
+    logId = await logSync(admin, "trustmrr_full_daily", "running");
+    synced = 0;
+    page = 1;
+    lines = [];
+  }
+
   let total = 0;
-  let lines: string[] = [];
   const errors: string[] = [];
 
   try {
-    if (logId) lines = await updateProgress(admin, logId, 0, 0, "Starting full sync...", lines);
+    if (logId) lines = await updateProgress(admin, logId, synced, 0, resuming ? `Resuming from page ${page}...` : "Starting full sync...", lines);
 
     let hasMore = true;
 
@@ -74,6 +101,7 @@ async function main() {
     if (logId) {
       await updateSyncLog(admin, logId, "completed", {
         synced,
+        page,
         total,
         errors: errors.length > 0 ? errors.slice(0, 20) : undefined,
         completed_at: new Date().toISOString(),
@@ -86,6 +114,7 @@ async function main() {
       await updateSyncLog(admin, logId, "failed", {
         error: msg,
         synced,
+        page,
         completed_at: new Date().toISOString(),
       });
     }
