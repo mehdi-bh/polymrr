@@ -22,43 +22,34 @@ const PAGE_SIZE = 50;
 async function main() {
   const admin = createAdminClient();
 
-  // Auto-resume: check if there's an incomplete run to continue from
+  // Check where the last run stopped so we can skip already-synced pages
   const { data: lastRun } = await admin
     .from("sync_log")
-    .select("id, status, details")
+    .select("details")
     .eq("source", "trustmrr_full_daily")
+    .in("status", ["running", "failed"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const prev = lastRun?.details as { synced?: number; page?: number; total?: number; lines?: string[] } | null;
-  const canResume = lastRun && (lastRun.status === "running" || lastRun.status === "failed") && (prev?.synced ?? 0) > 0;
+  const prev = lastRun?.details as { synced?: number; page?: number } | null;
+  const startPage = prev?.page ?? Math.floor((prev?.synced ?? 0) / PAGE_SIZE) + 1;
+  const startSynced = prev?.synced ?? 0;
 
-  let logId: number | null;
-  let synced: number;
-  let page: number;
-  let lines: string[];
-
-  if (canResume) {
-    logId = lastRun!.id;
-    synced = prev!.synced ?? 0;
-    // Derive page from synced count if page wasn't saved
-    page = prev!.page ?? Math.floor(synced / PAGE_SIZE) + 1;
-    lines = prev!.lines ?? [];
-    console.log(`[sync-startups] Resuming from page ${page} (${synced} already synced)`);
-    await updateSyncLog(admin, logId!, "running", { ...prev, resumed_at: new Date().toISOString() });
-  } else {
-    logId = await logSync(admin, "trustmrr_full_daily", "running");
-    synced = 0;
-    page = 1;
-    lines = [];
+  if (startPage > 1) {
+    console.log(`[sync-startups] Resuming from page ${startPage} (${startSynced} already synced)`);
   }
+
+  const logId = await logSync(admin, "trustmrr_full_daily", "running");
+  let synced = startSynced;
+  let page = startPage;
+  let lines: string[] = [];
 
   let total = 0;
   const errors: string[] = [];
 
   try {
-    if (logId) lines = await updateProgress(admin, logId, synced, 0, resuming ? `Resuming from page ${page}...` : "Starting full sync...", lines);
+    if (logId) lines = await updateProgress(admin, logId, synced, 0, startPage > 1 ? `Resuming from page ${startPage}...` : "Starting full sync...", lines);
 
     let hasMore = true;
 
