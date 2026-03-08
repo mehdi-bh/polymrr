@@ -2,44 +2,68 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, type ReactNode } from "react";
-import { FilterPill } from "@/components/ui/filter-pill";
+import { FilterPill, FilterGroup } from "@/components/ui/filter-pill";
 import { SearchInput } from "@/components/ui/search-input";
 import type { MarketType, MarketStatus, TrustMRRCategory } from "@/lib/types";
+import {
+  CircleDot,
+  Clock,
+  CheckCircle2,
+  Target,
+  TrendingUp,
+  Handshake,
+  HeartPulse,
+  Sparkles,
+  Code2,
+  ShoppingCart,
+  Blocks,
+  BarChart3,
+  Pen,
+  Share2,
+  Flame,
+  Star,
+  CalendarPlus,
+  Coins,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  Layers,
+  Bot,
+} from "lucide-react";
 
-const statusOptions: { value: MarketStatus | "closing-soon" | "all"; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "open", label: "Open" },
-  { value: "closing-soon", label: "Closing Soon" },
-  { value: "resolved", label: "Resolved" },
+const statusOptions: { value: MarketStatus | "closing-soon" | "all"; label: string; icon: ReactNode }[] = [
+  { value: "all", label: "All", icon: <Layers /> },
+  { value: "open", label: "Open", icon: <CircleDot /> },
+  { value: "closing-soon", label: "Closing Soon", icon: <Clock /> },
+  { value: "resolved", label: "Resolved", icon: <CheckCircle2 /> },
 ];
 
-const typeOptions: { value: MarketType | "all"; label: string }[] = [
-  { value: "all", label: "All Types" },
-  { value: "mrr-target", label: "MRR Target" },
-  { value: "growth-race", label: "Growth" },
-  { value: "acquisition", label: "Acquisition" },
-  { value: "survival", label: "Survival" },
+const typeOptions: { value: MarketType | "all"; label: string; icon: ReactNode }[] = [
+  { value: "all", label: "All", icon: <Layers /> },
+  { value: "mrr-target", label: "MRR Target", icon: <Target /> },
+  { value: "growth-race", label: "Growth", icon: <TrendingUp /> },
+  { value: "acquisition", label: "Acquisition", icon: <Handshake /> },
+  { value: "survival", label: "Survival", icon: <HeartPulse /> },
 ];
 
-const sortOptions = [
-  { value: "closing-soon", label: "Closing Soon" },
-  { value: "popular", label: "Popular" },
-  { value: "newest", label: "Newest" },
-  { value: "biggest-pot", label: "Biggest Pot" },
-  { value: "yes-odds-desc", label: "Most Bullish" },
-  { value: "yes-odds-asc", label: "Most Bearish" },
-] as const;
+const sortOptions: { value: string; label: string; icon: ReactNode }[] = [
+  { value: "closing-soon", label: "Closing Soon", icon: <Clock /> },
+  { value: "popular", label: "Popular", icon: <Flame /> },
+  { value: "newest", label: "Newest", icon: <CalendarPlus /> },
+  { value: "biggest-pot", label: "Biggest Pot", icon: <Coins /> },
+  { value: "yes-odds-desc", label: "Most Bullish", icon: <ArrowUpCircle /> },
+  { value: "yes-odds-asc", label: "Most Bearish", icon: <ArrowDownCircle /> },
+];
 
-const categoryOptions: { value: TrustMRRCategory | "all"; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "ai", label: "AI" },
-  { value: "saas", label: "SaaS" },
-  { value: "developer-tools", label: "Dev Tools" },
-  { value: "ecommerce", label: "E-commerce" },
-  { value: "no-code", label: "No-Code" },
-  { value: "analytics", label: "Analytics" },
-  { value: "content-creation", label: "Content" },
-  { value: "social-media", label: "Social" },
+const categoryOptions: { value: TrustMRRCategory | "all"; label: string; icon: ReactNode }[] = [
+  { value: "all", label: "All", icon: <Layers /> },
+  { value: "ai", label: "AI", icon: <Bot /> },
+  { value: "saas", label: "SaaS", icon: <Sparkles /> },
+  { value: "developer-tools", label: "Dev Tools", icon: <Code2 /> },
+  { value: "ecommerce", label: "E-commerce", icon: <ShoppingCart /> },
+  { value: "no-code", label: "No-Code", icon: <Blocks /> },
+  { value: "analytics", label: "Analytics", icon: <BarChart3 /> },
+  { value: "content-creation", label: "Content", icon: <Pen /> },
+  { value: "social-media", label: "Social", icon: <Share2 /> },
 ];
 
 interface MarketsFiltersProps {
@@ -86,33 +110,38 @@ export function MarketsFilters({ filters, children }: MarketsFiltersProps) {
         onChange={(value) => updateParams({ q: value || undefined, page: undefined })}
       />
 
-      <div className="space-y-3">
-        <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-x-6 gap-y-4">
+        <FilterGroup label="Status" icon={<CircleDot />}>
           {statusOptions.map((o) => (
-            <FilterPill key={o.value} active={filters.status === o.value} onClick={() => setFilter("status", o.value)}>
+            <FilterPill key={o.value} active={filters.status === o.value} onClick={() => setFilter("status", o.value)} icon={o.icon}>
               {o.label}
             </FilterPill>
           ))}
-          <div className="divider divider-horizontal mx-0" />
+        </FilterGroup>
+
+        <FilterGroup label="Type" icon={<Target />}>
           {typeOptions.map((o) => (
-            <FilterPill key={o.value} active={filters.type === o.value} onClick={() => setFilter("type", o.value)}>
+            <FilterPill key={o.value} active={filters.type === o.value} onClick={() => setFilter("type", o.value)} icon={o.icon}>
               {o.label}
             </FilterPill>
           ))}
-        </div>
-        <div className="flex flex-wrap gap-1.5">
+        </FilterGroup>
+
+        <FilterGroup label="Category" icon={<Sparkles />}>
           {categoryOptions.map((o) => (
-            <FilterPill key={o.value} active={filters.category === o.value} onClick={() => setFilter("category", o.value)}>
+            <FilterPill key={o.value} active={filters.category === o.value} onClick={() => setFilter("category", o.value)} icon={o.icon}>
               {o.label}
             </FilterPill>
           ))}
-          <div className="divider divider-horizontal mx-0" />
+        </FilterGroup>
+
+        <FilterGroup label="Sort" icon={<BarChart3 />}>
           {sortOptions.map((o) => (
-            <FilterPill key={o.value} active={filters.sort === o.value} onClick={() => setFilter("sort", o.value)}>
+            <FilterPill key={o.value} active={filters.sort === o.value} onClick={() => setFilter("sort", o.value)} icon={o.icon}>
               {o.label}
             </FilterPill>
           ))}
-        </div>
+        </FilterGroup>
       </div>
 
       {children}
