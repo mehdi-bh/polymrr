@@ -32,9 +32,10 @@ async function main() {
     .limit(1)
     .maybeSingle();
 
-  const prev = lastRun?.details as { synced?: number; page?: number } | null;
-  const startPage = prev?.page ?? Math.floor((prev?.synced ?? 0) / PAGE_SIZE) + 1;
-  const startSynced = prev?.synced ?? 0;
+  const prev = lastRun?.details as { synced?: number; processed?: number; page?: number } | null;
+  const prevSynced = prev?.synced ?? prev?.processed ?? 0;
+  const startPage = prev?.page ?? (prevSynced > 0 ? Math.floor(prevSynced / PAGE_SIZE) + 1 : 1);
+  const startSynced = prevSynced;
 
   if (startPage > 1) {
     console.log(`[sync-startups] Resuming from page ${startPage} (${startSynced} already synced)`);
