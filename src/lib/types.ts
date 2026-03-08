@@ -90,7 +90,7 @@ export interface Startup {
 
 // -- PolyMRR domain models --------------------------------------------------
 
-export type MarketType = "mrr-target" | "growth-race" | "acquisition" | "survival" | "founder";
+export type MarketType = "mrr-target" | "acquisition" | "founder";
 export type MarketStatus = "open" | "closed" | "resolved";
 
 export interface Market {

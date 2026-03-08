@@ -3,17 +3,16 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { MarketCard } from "@/components/market/market-card";
 import { OddsBar } from "@/components/market/odds-bar";
-import { MrrChart } from "@/components/startup/mrr-chart";
+import Image from "next/image";
 import { FounderCard } from "@/components/startup/founder-card";
 import {
   getStartupBySlug,
   getMarketsForStartup,
   getStartupSentiment,
   getStartupsByFounder,
-  getMrrHistory,
   formatCents,
 } from "@/lib/data";
-import { ExternalLink, TrendingUp, TrendingDown, Users, Calendar, Plus } from "lucide-react";
+import { ExternalLink, TrendingUp, TrendingDown, Plus, DollarSign, Activity, CalendarDays, MessageSquare } from "lucide-react";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -38,10 +37,7 @@ export default async function StartupPage({ params }: PageProps) {
   const startup = await getStartupBySlug(slug);
   if (!startup) notFound();
 
-  const [allMarkets, mrrData] = await Promise.all([
-    getMarketsForStartup(slug),
-    getMrrHistory(slug),
-  ]);
+  const allMarkets = await getMarketsForStartup(slug);
 
   const openMarkets = allMarkets.filter((m) => m.status === "open");
   const resolvedMarkets = allMarkets.filter((m) => m.status === "resolved");
@@ -96,30 +92,45 @@ export default async function StartupPage({ params }: PageProps) {
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-4 gap-4">
             <div>
-              <div className="mono-num text-2xl font-bold">{formatCents(startup.revenue.mrr)}</div>
-              <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-base-content/50">MRR</div>
+              <div className="mono-num text-2xl font-bold">{startup.revenue.total > 0 ? formatCents(startup.revenue.total) : "-"}</div>
+              <div className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-base-content/50">
+                <DollarSign className="h-3 w-3" /> Total Revenue
+              </div>
+            </div>
+            <div>
+              <div className="mono-num text-2xl font-bold">{startup.revenue.mrr > 0 ? formatCents(startup.revenue.mrr) : "-"}</div>
+              <div className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-base-content/50">
+                <Activity className="h-3 w-3" /> MRR
+              </div>
             </div>
             <div>
               <div className="flex items-center gap-1">
-                {growthPositive ? <TrendingUp className="h-5 w-5 text-yes" /> : <TrendingDown className="h-5 w-5 text-no" />}
-                <span className={`mono-num text-2xl font-bold ${growthPositive ? "text-yes" : "text-no"}`}>
-                  {startup.growth30d !== null ? `${startup.growth30d.toFixed(1)}%` : "N/A"}
-                </span>
+                {startup.growth30d !== null && startup.growth30d !== 0 ? (
+                  <>
+                    {growthPositive ? <TrendingUp className="h-5 w-5 text-yes" /> : <TrendingDown className="h-5 w-5 text-no" />}
+                    <span className={`mono-num text-2xl font-bold ${growthPositive ? "text-yes" : "text-no"}`}>
+                      {startup.growth30d.toFixed(1)}%
+                    </span>
+                  </>
+                ) : (
+                  <span className="mono-num text-2xl font-bold">-</span>
+                )}
               </div>
-              <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-base-content/50">30d Growth</div>
+              <div className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-base-content/50">
+                <TrendingUp className="h-3 w-3" /> 30d Growth
+              </div>
             </div>
             <div>
-              <div className="mono-num text-2xl font-bold">{formatCents(startup.revenue.total)}</div>
-              <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-base-content/50">Total Revenue</div>
-            </div>
-            <div>
-              <div className="mono-num flex items-center gap-1.5 text-2xl font-bold">
-                <Users className="h-5 w-5 text-base-content/50" />
-                {startup.customers.toLocaleString()}
+              <div className="text-2xl font-bold">
+                {startup.foundedDate
+                  ? new Date(startup.foundedDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+                  : "-"}
               </div>
-              <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-base-content/50">Customers</div>
+              <div className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-base-content/50">
+                <CalendarDays className="h-3 w-3" /> Founded
+              </div>
             </div>
           </div>
 
@@ -127,12 +138,6 @@ export default async function StartupPage({ params }: PageProps) {
             <div className="flex flex-wrap gap-2">
               {startup.category && <span className="badge badge-primary badge-outline badge-sm">{startup.category}</span>}
               <span className="badge badge-neutral badge-sm">{startup.paymentProvider}</span>
-              {startup.foundedDate && (
-                <span className="badge badge-neutral badge-sm gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {new Date(startup.foundedDate).getFullYear()}
-                </span>
-              )}
             </div>
             <div className="flex items-center gap-3">
               {startup.website && (
@@ -145,14 +150,6 @@ export default async function StartupPage({ params }: PageProps) {
                   Website <ExternalLink className="h-3 w-3" />
                 </a>
               )}
-              <a
-                href={`https://trustmrr.com/startup/${startup.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs text-base-content/50 transition-colors hover:text-base-content"
-              >
-                TrustMRR <ExternalLink className="h-3 w-3" />
-              </a>
             </div>
           </div>
         </div>
@@ -162,18 +159,34 @@ export default async function StartupPage({ params }: PageProps) {
       <div className="card bg-base-100 border border-base-300">
         <div className="card-body p-5">
           <div className="mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-base-content/50">Community Sentiment</span>
+            <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-base-content/50">
+              <MessageSquare className="h-3.5 w-3.5" /> Community Sentiment
+            </span>
           </div>
           <OddsBar yesOdds={sentiment} labels={{ yes: "BULLISH", no: "BEARISH" }} />
         </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="card bg-base-100 border border-base-300 lg:col-span-2">
-          <div className="card-body p-5">
-            <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-base-content/50">MRR History</h3>
-            <MrrChart slug={startup.slug} data={mrrData} height={240} />
-          </div>
+        <div className="space-y-4 lg:col-span-2">
+          <a
+            href={`https://trustmrr.com/startup/${startup.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-[13px] font-medium text-primary/80 transition-colors hover:bg-primary/10 hover:text-primary hover:border-primary/50"
+          >
+            <Image src="/trustmrr.webp" alt="TrustMRR" width={18} height={18} className="rounded-sm" />
+            View on TrustMRR
+          </a>
+
+          {openMarkets.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-lg font-bold">Active Markets</h2>
+              <div className="stagger-children grid gap-4 sm:grid-cols-2">
+                {openMarkets.map((m) => <MarketCard key={m.id} market={m} startup={startup} />)}
+              </div>
+            </div>
+          )}
         </div>
 
         {founderData.map((fd) => (
@@ -186,15 +199,6 @@ export default async function StartupPage({ params }: PageProps) {
           />
         ))}
       </div>
-
-      {openMarkets.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-bold">Active Markets</h2>
-          <div className="stagger-children grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {openMarkets.map((m) => <MarketCard key={m.id} market={m} startup={startup} />)}
-          </div>
-        </div>
-      )}
 
       {resolvedMarkets.length > 0 && (
         <div className="space-y-4">

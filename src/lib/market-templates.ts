@@ -9,10 +9,6 @@ export type MetricId =
   | "mrr"
   | "revenue_30d"
   | "revenue_total"
-  | "customers"
-  | "active_subs"
-  | "growth_30d"
-  | "profit_margin"
   | "on_sale"
   | "founder_revenue"
   | "founder_startups"
@@ -21,7 +17,7 @@ export type MetricId =
 
 export type ConditionId = "gte" | "lte" | "eq";
 
-export type MarketType = "mrr-target" | "growth-race" | "acquisition" | "survival" | "founder";
+export type MarketType = "mrr-target" | "acquisition" | "founder";
 
 export interface ResolutionConfig {
   metric: MetricId;
@@ -74,38 +70,6 @@ export const METRICS: Record<MetricId, MetricDef> = {
     label: "Total Revenue",
     validConditions: ["gte"],
     marketType: "mrr-target",
-  },
-  customers: {
-    id: "customers",
-    dbColumn: "customers",
-    unit: "count",
-    label: "Customers",
-    validConditions: ["gte", "lte"],
-    marketType: "growth-race",
-  },
-  active_subs: {
-    id: "active_subs",
-    dbColumn: "active_subscriptions",
-    unit: "count",
-    label: "Active Subs",
-    validConditions: ["gte", "lte"],
-    marketType: "growth-race",
-  },
-  growth_30d: {
-    id: "growth_30d",
-    dbColumn: "growth_30d",
-    unit: "percent",
-    label: "30d Growth",
-    validConditions: ["gte", "lte"],
-    marketType: "growth-race",
-  },
-  profit_margin: {
-    id: "profit_margin",
-    dbColumn: "profit_margin_last_30_days",
-    unit: "percent",
-    label: "Profit Margin",
-    validConditions: ["gte", "lte"],
-    marketType: "survival",
   },
   on_sale: {
     id: "on_sale",
@@ -304,10 +268,6 @@ export const METRIC_DESCRIPTIONS: Record<MetricId, string> = {
   mrr: "Monthly Recurring Revenue from active subscriptions",
   revenue_30d: "Total revenue in the last 30 days, including one-time sales",
   revenue_total: "All-time total revenue since launch",
-  customers: "Total number of paying customers",
-  active_subs: "Currently active subscriptions",
-  growth_30d: "Month-over-month revenue growth rate",
-  profit_margin: "Percentage of revenue that is profit after costs",
   on_sale: "Whether the startup is listed for sale on a marketplace",
   founder_revenue: "Total revenue across all of this founder's startups",
   founder_startups: "Number of startups this founder is building",
@@ -362,20 +322,7 @@ export function generateSuggestions(startup: Startup): BetSuggestion[] {
     });
   }
 
-  // 2. Customer milestone
-  if (startup.customers > 10) {
-    const target = niceRoundCount(Math.round(startup.customers * 1.5));
-    suggestions.push({
-      label: `Reach ${target.toLocaleString()} customers`,
-      description: `Currently at ${startup.customers.toLocaleString()}`,
-      metric: "customers",
-      condition: "gte",
-      target,
-      daysFromNow: 90,
-    });
-  }
-
-  // 3. Bearish / drop bet
+  // 2. Bearish / drop bet
   if (mrr > 0) {
     const target = niceRoundCents(Math.round(mrr * 0.7));
     suggestions.push({

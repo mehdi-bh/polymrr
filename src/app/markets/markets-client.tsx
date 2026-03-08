@@ -6,7 +6,7 @@ import { FilterSelect, type FilterOption } from "@/components/ui/filter-select";
 import { SearchInput } from "@/components/ui/search-input";
 import type { MarketType, MarketStatus, TrustMRRCategory } from "@/lib/types";
 import {
-  CircleDot, Clock, CheckCircle2, Target, TrendingUp, Handshake, HeartPulse,
+  CircleDot, Clock, CheckCircle2, Target, Handshake,
   Sparkles, Code2, ShoppingCart, Blocks, BarChart3, Pen, Share2, Flame,
   CalendarPlus, Coins, ArrowUpCircle, ArrowDownCircle, Layers, Bot,
 } from "lucide-react";
@@ -21,9 +21,7 @@ const statusOptions: FilterOption[] = [
 const typeOptions: FilterOption[] = [
   { value: "all", label: "All Types", icon: <Layers /> },
   { value: "mrr-target", label: "MRR Target", icon: <Target /> },
-  { value: "growth-race", label: "Growth", icon: <TrendingUp /> },
   { value: "acquisition", label: "Acquisition", icon: <Handshake /> },
-  { value: "survival", label: "Survival", icon: <HeartPulse /> },
   { value: "founder", label: "Founder", icon: <Flame /> },
 ];
 

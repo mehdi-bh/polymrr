@@ -57,12 +57,14 @@ export function StartupCard({ startup, activeMarketCount, sentiment }: StartupCa
           </div>
         </div>
 
-        <div className="mt-auto flex items-center justify-between text-xs text-base-content/50">
-          <span>{activeMarketCount} active market{activeMarketCount !== 1 ? "s" : ""}</span>
-          <span className={`mono-num font-semibold ${sentiment >= 50 ? "text-yes" : "text-no"}`}>
-            {sentiment}% bullish
-          </span>
-        </div>
+        {activeMarketCount > 0 && (
+          <div className="mt-auto flex items-center justify-between text-xs text-base-content/50">
+            <span>{activeMarketCount} active market{activeMarketCount !== 1 ? "s" : ""}</span>
+            <span className={`mono-num font-semibold ${sentiment >= 50 ? "text-yes" : "text-no"}`}>
+              {sentiment}% bullish
+            </span>
+          </div>
+        )}
       </div>
     </Link>
   );

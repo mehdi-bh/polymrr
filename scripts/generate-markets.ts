@@ -17,7 +17,6 @@ import {
 
 const MAX_MARKETS = 30;
 const MRR_MILESTONES = [100_000, 500_000, 1_000_000, 2_500_000, 5_000_000, 10_000_000];
-const CUSTOMER_MILESTONES = [50, 100, 500, 1_000, 5_000];
 
 function daysFromNow(days: number): string {
   const d = new Date();
@@ -55,12 +54,6 @@ function generateBlueprints(s: any): MarketBlueprint[] {
   for (const m of MRR_MILESTONES) {
     if (mrr > 0 && mrr >= m * 0.7 && mrr < m) {
       bps.push({ startupSlug: s.slug, metric: "mrr", condition: "gte", target: m, closesAt: daysFromNow(90), seedSide: "yes", seedAmount: 0 });
-    }
-  }
-
-  for (const m of CUSTOMER_MILESTONES) {
-    if (customers > 0 && customers >= m * 0.7 && customers < m) {
-      bps.push({ startupSlug: s.slug, metric: "customers", condition: "gte", target: m, closesAt: daysFromNow(90), seedSide: "yes", seedAmount: 0 });
     }
   }
 

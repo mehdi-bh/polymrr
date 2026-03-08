@@ -110,6 +110,8 @@ export function CreateMarketForm({
   const [seedAmount, setSeedAmount] = useState("100");
   // For founder_top_startup: which startup is being bet on
   const [topStartupSlug, setTopStartupSlug] = useState("");
+  // For founder picker in step 1
+  const [selectedFounderHandle, setSelectedFounderHandle] = useState("");
 
   // In founder mode, skip step 1 (startup picker) — go straight to metric
   const [step, setStep] = useState(initialStartupSlug || isFounderMode ? 2 : 1);
@@ -220,7 +222,7 @@ export function CreateMarketForm({
 
   const canProceed = () => {
     switch (step) {
-      case 1: return !!startupSlug;
+      case 1: return pickerTab === "founders" ? !!selectedFounderHandle : !!startupSlug;
       case 2: return !!metric;
       case 3: {
         if (metric === "founder_top_startup") return !!topStartupSlug;
@@ -321,13 +323,11 @@ export function CreateMarketForm({
   return (
     <TooltipProvider>
       <div className="mx-auto max-w-2xl space-y-6 animate-fade-up">
-        <h1 className="text-2xl font-bold">
-          {isFounderMode ? "Bet on a Founder" : "Create a Market"}
-        </h1>
+        <h1 className="text-2xl font-bold">Create a Market</h1>
 
         {/* Step indicator */}
         <div className="flex gap-2">
-          {(isFounderMode ? [2, 3, 4, 5] : [1, 2, 3, 4, 5]).map((s) => (
+          {[1, 2, 3, 4, 5].map((s) => (
             <div
               key={s}
               className={`h-1.5 flex-1 rounded-full transition-colors ${
@@ -550,10 +550,12 @@ export function CreateMarketForm({
             {pickerReadyTab === pickerTab && pickerTab === "founders" && (
               <div className="grid gap-2 sm:grid-cols-2">
                 {pickerFounders.map((f) => (
-                  <Link
+                  <button
                     key={f.xHandle}
-                    href={`/markets/create?founder=${f.xHandle}`}
-                    className="btn btn-ghost justify-start gap-3 h-auto py-3"
+                    onClick={() => setSelectedFounderHandle(f.xHandle)}
+                    className={`btn btn-ghost justify-start gap-3 h-auto py-3 ${
+                      selectedFounderHandle === f.xHandle ? "btn-outline btn-primary" : ""
+                    }`}
                   >
                     <FounderAvatar
                       xHandle={f.xHandle}
@@ -568,7 +570,7 @@ export function CreateMarketForm({
                           : `${f.startupCount} startup${f.startupCount !== 1 ? "s" : ""}`}
                       </div>
                     </div>
-                  </Link>
+                  </button>
                 ))}
               </div>
             )}
@@ -730,26 +732,6 @@ export function CreateMarketForm({
                     </span>
                   </div>
                 )}
-                {!isFounderMode && selectedMetric.unit === "count" && selectedStartup && (
-                  <div className="text-sm text-base-content/50">
-                    Current {selectedMetric.label}:{" "}
-                    <span className="mono-num font-semibold text-base-content/70">
-                      {selectedMetric.id === "customers" && selectedStartup.customers.toLocaleString()}
-                      {selectedMetric.id === "active_subs" && selectedStartup.activeSubscriptions.toLocaleString()}
-                    </span>
-                  </div>
-                )}
-                {!isFounderMode && selectedMetric.unit === "percent" && selectedMetric.id === "growth_30d" && selectedStartup && (
-                  <div className="text-sm text-base-content/50">
-                    Current growth:{" "}
-                    <span className="mono-num font-semibold text-base-content/70">
-                      {selectedStartup.growth30d !== null
-                        ? `${selectedStartup.growth30d.toFixed(1)}%`
-                        : "N/A"}
-                    </span>
-                  </div>
-                )}
-
                 {selectedMetric.unit !== "boolean" ? (
                   <>
                     <div className="flex gap-2">
@@ -920,9 +902,15 @@ export function CreateMarketForm({
 
         {/* Navigation */}
         <div className="flex gap-3">
-          {step > (isFounderMode ? 2 : 1) && (
+          {step > 1 && (
             <button
-              onClick={() => setStep(step - 1)}
+              onClick={() => {
+                if (isFounderMode && step === 2) {
+                  router.push("/markets/create");
+                  return;
+                }
+                setStep(step - 1);
+              }}
               className="btn btn-ghost gap-1"
             >
               <ChevronLeft className="h-4 w-4" /> Back
@@ -931,7 +919,13 @@ export function CreateMarketForm({
           <div className="flex-1" />
           {step < 5 ? (
             <button
-              onClick={() => setStep(step + 1)}
+              onClick={() => {
+                if (step === 1 && pickerTab === "founders" && selectedFounderHandle) {
+                  router.push(`/markets/create?founder=${selectedFounderHandle}`);
+                  return;
+                }
+                setStep(step + 1);
+              }}
               disabled={!canProceed()}
               className="btn btn-primary gap-1"
             >
