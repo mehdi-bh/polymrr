@@ -237,7 +237,7 @@ export async function updateSyncLog(
     .neq("status", "cancelled");
 }
 
-/** Update progress on a running sync_log entry (keeps last 50 log lines).
+/** Update progress on a running sync_log entry.
  *  Pass line=null to update counters without adding a log line. */
 export async function updateProgress(
   admin: Admin,
@@ -247,7 +247,7 @@ export async function updateProgress(
   line: string | null,
   prevLines: string[]
 ) {
-  const lines = line ? [...prevLines, line].slice(-50) : prevLines;
+  const lines = line ? [...prevLines, line] : prevLines;
   const { error } = await admin
     .from("sync_log")
     .update({

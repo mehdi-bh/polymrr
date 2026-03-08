@@ -64,17 +64,13 @@ async function main() {
             await storeSnapshot(admin, { ...item, xFollowerCount: null, isMerchantOfRecord: false, techStack: [], cofounders: [] });
           }
           synced++;
-          if (logId) lines = await updateProgress(admin, logId, synced, total, null, lines);
+          if (logId) lines = await updateProgress(admin, logId, synced, total, `${synced}/${total} ${item.slug} OK`, lines);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           errors.push(`${item.slug}: ${msg}`);
           synced++;
           if (logId) lines = await updateProgress(admin, logId, synced, total, `${item.slug} FAILED: ${msg}`, lines);
         }
-      }
-
-      if (page % 5 === 0 && logId) {
-        lines = await updateProgress(admin, logId, synced, total, `${synced}/${total} synced (${newCount} new)`, lines);
       }
 
       page++;
