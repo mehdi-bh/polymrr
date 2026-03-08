@@ -2,51 +2,31 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, type ReactNode } from "react";
-import { FilterPill, FilterGroup } from "@/components/ui/filter-pill";
+import { FilterSelect, type FilterOption } from "@/components/ui/filter-select";
 import { SearchInput } from "@/components/ui/search-input";
 import type { MarketType, MarketStatus, TrustMRRCategory } from "@/lib/types";
 import {
-  CircleDot,
-  Clock,
-  CheckCircle2,
-  Target,
-  TrendingUp,
-  Handshake,
-  HeartPulse,
-  Sparkles,
-  Code2,
-  ShoppingCart,
-  Blocks,
-  BarChart3,
-  Pen,
-  Share2,
-  Flame,
-  Star,
-  CalendarPlus,
-  Coins,
-  ArrowUpCircle,
-  ArrowDownCircle,
-  Layers,
-  Bot,
+  CircleDot, Clock, CheckCircle2, Target, TrendingUp, Handshake, HeartPulse,
+  Sparkles, Code2, ShoppingCart, Blocks, BarChart3, Pen, Share2, Flame,
+  CalendarPlus, Coins, ArrowUpCircle, ArrowDownCircle, Layers, Bot,
 } from "lucide-react";
 
-const statusOptions: { value: MarketStatus | "closing-soon" | "all"; label: string; icon: ReactNode }[] = [
-  { value: "all", label: "All", icon: <Layers /> },
+const statusOptions: FilterOption[] = [
+  { value: "all", label: "All Statuses", icon: <Layers /> },
   { value: "open", label: "Open", icon: <CircleDot /> },
   { value: "closing-soon", label: "Closing Soon", icon: <Clock /> },
   { value: "resolved", label: "Resolved", icon: <CheckCircle2 /> },
 ];
 
-const typeOptions: { value: MarketType | "all"; label: string; icon: ReactNode }[] = [
-  { value: "all", label: "All", icon: <Layers /> },
+const typeOptions: FilterOption[] = [
+  { value: "all", label: "All Types", icon: <Layers /> },
   { value: "mrr-target", label: "MRR Target", icon: <Target /> },
   { value: "growth-race", label: "Growth", icon: <TrendingUp /> },
   { value: "acquisition", label: "Acquisition", icon: <Handshake /> },
   { value: "survival", label: "Survival", icon: <HeartPulse /> },
 ];
 
-const sortOptions: { value: string; label: string; icon: ReactNode }[] = [
-  { value: "closing-soon", label: "Closing Soon", icon: <Clock /> },
+const sortOptions: FilterOption[] = [
   { value: "popular", label: "Popular", icon: <Flame /> },
   { value: "newest", label: "Newest", icon: <CalendarPlus /> },
   { value: "biggest-pot", label: "Biggest Pot", icon: <Coins /> },
@@ -54,8 +34,8 @@ const sortOptions: { value: string; label: string; icon: ReactNode }[] = [
   { value: "yes-odds-asc", label: "Most Bearish", icon: <ArrowDownCircle /> },
 ];
 
-const categoryOptions: { value: TrustMRRCategory | "all"; label: string; icon: ReactNode }[] = [
-  { value: "all", label: "All", icon: <Layers /> },
+const categoryOptions: FilterOption[] = [
+  { value: "all", label: "All Categories", icon: <Layers /> },
   { value: "ai", label: "AI", icon: <Bot /> },
   { value: "saas", label: "SaaS", icon: <Sparkles /> },
   { value: "developer-tools", label: "Dev Tools", icon: <Code2 /> },
@@ -82,8 +62,7 @@ export function MarketsFilters({ filters, children }: MarketsFiltersProps) {
         if (
           !value ||
           value === "all" ||
-          (key === "sort" && value === "closing-soon") ||
-          (key === "status" && value === "closing-soon")
+          (key === "sort" && value === "popular")
         ) {
           params.delete(key);
         } else {
@@ -110,38 +89,11 @@ export function MarketsFilters({ filters, children }: MarketsFiltersProps) {
         onChange={(value) => updateParams({ q: value || undefined, page: undefined })}
       />
 
-      <div className="flex flex-wrap gap-x-6 gap-y-4">
-        <FilterGroup label="Status" icon={<CircleDot />}>
-          {statusOptions.map((o) => (
-            <FilterPill key={o.value} active={filters.status === o.value} onClick={() => setFilter("status", o.value)} icon={o.icon}>
-              {o.label}
-            </FilterPill>
-          ))}
-        </FilterGroup>
-
-        <FilterGroup label="Type" icon={<Target />}>
-          {typeOptions.map((o) => (
-            <FilterPill key={o.value} active={filters.type === o.value} onClick={() => setFilter("type", o.value)} icon={o.icon}>
-              {o.label}
-            </FilterPill>
-          ))}
-        </FilterGroup>
-
-        <FilterGroup label="Category" icon={<Sparkles />}>
-          {categoryOptions.map((o) => (
-            <FilterPill key={o.value} active={filters.category === o.value} onClick={() => setFilter("category", o.value)} icon={o.icon}>
-              {o.label}
-            </FilterPill>
-          ))}
-        </FilterGroup>
-
-        <FilterGroup label="Sort" icon={<BarChart3 />}>
-          {sortOptions.map((o) => (
-            <FilterPill key={o.value} active={filters.sort === o.value} onClick={() => setFilter("sort", o.value)} icon={o.icon}>
-              {o.label}
-            </FilterPill>
-          ))}
-        </FilterGroup>
+      <div className="flex flex-wrap items-center gap-3">
+        <FilterSelect value={filters.status} options={statusOptions} onChange={(v) => setFilter("status", v)} />
+        <FilterSelect value={filters.type} options={typeOptions} onChange={(v) => setFilter("type", v)} />
+        <FilterSelect value={filters.category} options={categoryOptions} onChange={(v) => setFilter("category", v)} />
+        <FilterSelect value={filters.sort} options={sortOptions} onChange={(v) => setFilter("sort", v)} />
       </div>
 
       {children}

@@ -234,6 +234,9 @@ export async function getStartupsPaginated(
     case "followers-desc":
       query = query.order("x_followers", { ascending: false, nullsFirst: false });
       break;
+    case "revenue-desc":
+      query = query.order("revenue_total", { ascending: false, nullsFirst: false });
+      break;
     case "alpha":
       query = query.order("name", { ascending: true });
       break;

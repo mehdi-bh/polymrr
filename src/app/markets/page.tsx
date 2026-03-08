@@ -23,10 +23,10 @@ const PER_PAGE = 12;
 export default async function MarketsPage({ searchParams }: Props) {
   const params = await searchParams;
   const filters = {
-    status: params.status ?? "closing-soon",
+    status: params.status ?? "all",
     type: params.type ?? "all",
     category: params.category ?? "all",
-    sort: params.sort ?? "closing-soon",
+    sort: params.sort ?? "popular",
     search: params.q ?? "",
   };
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
