@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser, getStartups, getStartupsByFounder } from "@/lib/data";
+import { getCurrentUser, getStartups, getStartupsByFounder, getOpenMarkets } from "@/lib/data";
 import { CreateMarketForm } from "@/components/market/create-market-form";
 
 interface PageProps {
@@ -7,9 +7,10 @@ interface PageProps {
 }
 
 export default async function CreateMarketPage({ searchParams }: PageProps) {
-  const [user, startups, params] = await Promise.all([
+  const [user, startups, openMarkets, params] = await Promise.all([
     getCurrentUser(),
     getStartups(),
+    getOpenMarkets(),
     searchParams,
   ]);
 
@@ -42,6 +43,7 @@ export default async function CreateMarketPage({ searchParams }: PageProps) {
         user={user}
         initialStartupSlug={initialStartupSlug}
         initialFounder={initialFounder}
+        openMarkets={openMarkets}
       />
     </div>
   );

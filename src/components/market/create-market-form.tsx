@@ -26,7 +26,7 @@ import {
   type BetSuggestion,
 } from "@/lib/market-templates";
 import { formatCents } from "@/lib/helpers";
-import type { Startup, User } from "@/lib/types";
+import type { Startup, User, Market } from "@/lib/types";
 import { QUEST_MAP } from "@/lib/quests";
 import {
   ChevronLeft,
@@ -39,7 +39,10 @@ import {
   Users,
   Sparkles,
   Pencil,
+  X,
 } from "lucide-react";
+import Link from "next/link";
+import { OddsBar } from "@/components/market/odds-bar";
 
 interface CreateMarketFormProps {
   startups: Startup[];
@@ -50,6 +53,7 @@ interface CreateMarketFormProps {
     xName: string | null;
     startups: Startup[];
   };
+  openMarkets: Market[];
 }
 
 const CONDITION_LABELS: Record<ConditionId, string> = {
@@ -69,10 +73,12 @@ export function CreateMarketForm({
   user,
   initialStartupSlug,
   initialFounder,
+  openMarkets,
 }: CreateMarketFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [showMarkets, setShowMarkets] = useState(false);
 
   const isFounderMode = !!initialFounder;
 
@@ -258,6 +264,23 @@ export function CreateMarketForm({
     };
   }, [initialFounder]);
 
+  // Active markets for the selected startup or founder
+  const relatedMarkets = useMemo(() => {
+    if (isFounderMode && initialFounder) {
+      const founderSlugs = new Set(initialFounder.startups.map((s) => s.slug));
+      return openMarkets.filter(
+        (m) => m.founderXHandle === initialFounder.xHandle || founderSlugs.has(m.startupSlug)
+      );
+    }
+    if (startupSlug) {
+      return openMarkets.filter((m) => m.startupSlug === startupSlug);
+    }
+    return [];
+  }, [isFounderMode, initialFounder, startupSlug, openMarkets]);
+
+  const getMarketsForSlug = (slug: string) =>
+    openMarkets.filter((m) => m.startupSlug === slug);
+
   return (
     <TooltipProvider>
       <div className="mx-auto max-w-2xl space-y-6 animate-fade-up">
@@ -296,6 +319,14 @@ export function CreateMarketForm({
                   )}
                 </div>
               </div>
+              {relatedMarkets.length > 0 && (
+                <button
+                  onClick={() => setShowMarkets(true)}
+                  className="btn btn-ghost btn-xs gap-1 text-primary"
+                >
+                  {relatedMarkets.length} active market{relatedMarkets.length !== 1 ? "s" : ""}
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -345,18 +376,28 @@ export function CreateMarketForm({
                   </span>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  setStep(1);
-                  setStartupSlug("");
-                  setMetric(null);
-                  setTarget("");
-                  setClosesAt("");
-                }}
-                className="btn btn-ghost btn-xs"
-              >
-                Change
-              </button>
+              <div className="flex items-center gap-2">
+                {relatedMarkets.length > 0 && (
+                  <button
+                    onClick={() => setShowMarkets(true)}
+                    className="btn btn-ghost btn-xs gap-1 text-primary"
+                  >
+                    {relatedMarkets.length} active market{relatedMarkets.length !== 1 ? "s" : ""}
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setStep(1);
+                    setStartupSlug("");
+                    setMetric(null);
+                    setTarget("");
+                    setClosesAt("");
+                  }}
+                  className="btn btn-ghost btn-xs"
+                >
+                  Change
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -373,25 +414,33 @@ export function CreateMarketForm({
               className="input input-bordered w-full bg-base-200"
             />
             <div className="grid gap-2 sm:grid-cols-2">
-              {filteredStartups.map((s) => (
-                <button
-                  key={s.slug}
-                  onClick={() => setStartupSlug(s.slug)}
-                  className={`btn btn-ghost justify-start gap-3 h-auto py-3 ${
-                    startupSlug === s.slug ? "btn-outline btn-primary" : ""
-                  }`}
-                >
-                  {s.icon && (
-                    <img src={s.icon} alt="" className="h-8 w-8 rounded" />
-                  )}
-                  <div className="text-left">
-                    <div className="font-semibold">{s.name}</div>
-                    <div className="text-xs text-base-content/50">
-                      {formatCents(s.revenue.mrr)} MRR
+              {filteredStartups.map((s) => {
+                const mc = getMarketsForSlug(s.slug).length;
+                return (
+                  <button
+                    key={s.slug}
+                    onClick={() => setStartupSlug(s.slug)}
+                    className={`btn btn-ghost justify-start gap-3 h-auto py-3 ${
+                      startupSlug === s.slug ? "btn-outline btn-primary" : ""
+                    }`}
+                  >
+                    {s.icon && (
+                      <img src={s.icon} alt="" className="h-8 w-8 rounded" />
+                    )}
+                    <div className="flex-1 text-left">
+                      <div className="font-semibold">{s.name}</div>
+                      <div className="text-xs text-base-content/50">
+                        {formatCents(s.revenue.mrr)} MRR
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                    {mc > 0 && (
+                      <span className="badge badge-sm badge-primary badge-outline mono-num">
+                        {mc}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -776,6 +825,41 @@ export function CreateMarketForm({
           )}
         </div>
       </div>
+
+      {/* Active markets modal */}
+      {showMarkets && relatedMarkets.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowMarkets(false)} />
+          <div className="relative w-full max-w-md rounded-2xl border border-base-300 bg-base-100 shadow-xl">
+            <div className="flex items-center justify-between border-b border-base-300 px-5 py-4">
+              <h3 className="text-sm font-bold uppercase tracking-wider">
+                Active Markets ({relatedMarkets.length})
+              </h3>
+              <button onClick={() => setShowMarkets(false)} className="btn btn-ghost btn-xs btn-square">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto p-3 space-y-2">
+              {relatedMarkets.map((m) => (
+                <Link
+                  key={m.id}
+                  href={`/markets/${m.id}`}
+                  className="block rounded-lg border border-base-300 p-4 transition-colors hover:border-primary/30 hover:bg-base-200/50"
+                >
+                  <div className="text-[13px] font-semibold leading-snug">{m.question}</div>
+                  <div className="mt-2">
+                    <OddsBar yesOdds={m.yesOdds} size="sm" />
+                  </div>
+                  <div className="mt-2 flex items-center gap-4 text-[11px] text-base-content/50">
+                    <span className="mono-num"><Credits amount={m.totalCredits} size="xs" /> pool</span>
+                    <span className="mono-num">{m.totalBettors} bettor{m.totalBettors !== 1 ? "s" : ""}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </TooltipProvider>
   );
 }

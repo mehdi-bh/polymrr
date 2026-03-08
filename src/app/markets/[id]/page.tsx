@@ -4,9 +4,11 @@ import Link from "next/link";
 import { OddsBar } from "@/components/market/odds-bar";
 import { BetForm } from "@/components/market/bet-form";
 import { MrrChart } from "@/components/startup/mrr-chart";
+import { FounderAvatar } from "@/components/founder/founder-avatar";
 import {
   getMarketById,
   getStartupBySlug,
+  getStartupsByFounder,
   getBetsForMarket,
   getUserById,
   getMrrHistory,
@@ -17,6 +19,7 @@ import {
 } from "@/lib/data";
 import { Credits } from "@/components/ui/credits";
 import { ShareMarketButton } from "@/components/market/share-market-button";
+import { XIcon } from "@/components/ui/x-icon";
 import { Clock, Users, ExternalLink, MessageCircle } from "lucide-react";
 
 interface PageProps {
@@ -27,6 +30,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params;
   const market = await getMarketById(id);
   if (!market) return {};
+
+  const isFounderMarket = market.type === "founder" && market.founderXHandle;
+
+  if (isFounderMarket) {
+    return {
+      title: `${market.question} — @${market.founderXHandle}`,
+      description: `${Math.round(market.yesOdds * 100)}% chance YES. ${market.totalBettors} bettors, ${market.totalCredits.toLocaleString()} bananas in the pool.`,
+      openGraph: {
+        title: market.question,
+        description: `@${market.founderXHandle} — ${Math.round(market.yesOdds * 100)}% YES. Bet now on PolyMRR.`,
+      },
+    };
+  }
+
   const startup = await getStartupBySlug(market.startupSlug);
   return {
     title: `${market.question} — ${startup?.name ?? "Market"}`,
@@ -43,6 +60,7 @@ const typeLabels: Record<string, string> = {
   "growth-race": "Growth Race",
   acquisition: "Acquisition",
   survival: "Survival",
+  founder: "Founder",
 };
 
 export default async function MarketPage({ params }: PageProps) {
@@ -50,12 +68,18 @@ export default async function MarketPage({ params }: PageProps) {
   const market = await getMarketById(id);
   if (!market) notFound();
 
+  const isFounderMarket = market.type === "founder" && market.founderXHandle;
+
   const startup = await getStartupBySlug(market.startupSlug);
   if (!startup) notFound();
 
+  const founderStartups = isFounderMarket
+    ? await getStartupsByFounder(market.founderXHandle!)
+    : [];
+
   const [recentBets, mrrData, user] = await Promise.all([
     getBetsForMarket(market.id),
-    getMrrHistory(startup.slug),
+    isFounderMarket ? Promise.resolve([]) : getMrrHistory(startup.slug),
     getCurrentUser(),
   ]);
 
@@ -68,6 +92,13 @@ export default async function MarketPage({ params }: PageProps) {
 
   const days = daysUntil(market.closesAt);
 
+  // Founder aggregate stats
+  const founderTotalMrr = founderStartups.reduce((sum, s) => sum + s.revenue.mrr, 0);
+  const founderTotalRevenue = founderStartups.reduce((sum, s) => sum + s.revenue.total, 0);
+  const founderAvgGrowth = founderStartups.length > 0
+    ? founderStartups.reduce((sum, s) => sum + (s.growth30d ?? 0), 0) / founderStartups.length
+    : 0;
+
   return (
     <div className="space-y-6 animate-fade-up">
       {/* Market Header */}
@@ -75,13 +106,30 @@ export default async function MarketPage({ params }: PageProps) {
         <div className="card-body gap-5 p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Link href={`/startups/${startup.slug}`} className="flex items-center gap-2.5 transition-colors hover:text-primary">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-                  {startup.name.slice(0, 2).toUpperCase()}
-                </div>
-                <span className="font-semibold">{startup.name}</span>
-                <ExternalLink className="h-3.5 w-3.5 text-base-content/50" />
-              </Link>
+              {isFounderMarket ? (
+                <a
+                  href={`https://x.com/${market.founderXHandle}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2.5 transition-colors hover:text-primary"
+                >
+                  <FounderAvatar
+                    xHandle={market.founderXHandle!}
+                    name={market.founderXHandle!}
+                    size={40}
+                  />
+                  <span className="font-semibold">@{market.founderXHandle}</span>
+                  <XIcon size={14} className="text-base-content/50" />
+                </a>
+              ) : (
+                <Link href={`/startups/${startup.slug}`} className="flex items-center gap-2.5 transition-colors hover:text-primary">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                    {startup.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <span className="font-semibold">{startup.name}</span>
+                  <ExternalLink className="h-3.5 w-3.5 text-base-content/50" />
+                </Link>
+              )}
               <span className="badge badge-neutral badge-sm">{typeLabels[market.type]}</span>
               {market.status === "resolved" && (
                 <span className={`badge badge-sm ${
@@ -91,7 +139,7 @@ export default async function MarketPage({ params }: PageProps) {
                 </span>
               )}
             </div>
-            {(startup.xHandle || startup.cofounders?.[0]?.xHandle) && (
+            {!isFounderMarket && (startup.xHandle || startup.cofounders?.[0]?.xHandle) && (
               <a
                 href={`https://x.com/${startup.xHandle || startup.cofounders[0].xHandle}`}
                 target="_blank"
@@ -126,8 +174,8 @@ export default async function MarketPage({ params }: PageProps) {
             </div>
             <ShareMarketButton
               question={market.question}
-              startupName={startup.name}
-              startupIcon={startup.icon}
+              startupName={isFounderMarket ? `@${market.founderXHandle}` : startup.name}
+              startupIcon={isFounderMarket ? null : startup.icon}
               yesOdds={market.yesOdds}
               marketId={market.id}
             />
@@ -151,31 +199,107 @@ export default async function MarketPage({ params }: PageProps) {
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="card bg-base-100 border border-base-300">
-              <div className="card-body p-5">
-                <div className="mono-num text-2xl font-bold">{formatCents(startup.revenue.mrr)}</div>
-                <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-base-content/50">Current MRR</div>
-              </div>
-            </div>
-            <div className="card bg-base-100 border border-base-300">
-              <div className="card-body p-5">
-                <div className={`mono-num text-2xl font-bold ${(startup.growth30d ?? 0) >= 0 ? "text-yes" : "text-no"}`}>
-                  {startup.growth30d !== null
-                    ? `${startup.growth30d >= 0 ? "+" : ""}${startup.growth30d.toFixed(1)}%`
-                    : "N/A"}
+          {isFounderMarket ? (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="card bg-base-100 border border-base-300">
+                  <div className="card-body p-5">
+                    <div className="mono-num text-2xl font-bold">{formatCents(founderTotalRevenue)}</div>
+                    <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-base-content/50">Total Revenue</div>
+                  </div>
                 </div>
-                <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-base-content/50">30d Growth</div>
+                <div className="card bg-base-100 border border-base-300">
+                  <div className="card-body p-5">
+                    <div className="mono-num text-2xl font-bold">{founderStartups.length}</div>
+                    <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-base-content/50">Startups</div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          <div className="card bg-base-100 border border-base-300">
-            <div className="card-body p-5">
-              <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-base-content/50">MRR History</h3>
-              <MrrChart slug={startup.slug} data={mrrData} height={180} />
-            </div>
-          </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="card bg-base-100 border border-base-300">
+                  <div className="card-body p-5">
+                    <div className="mono-num text-2xl font-bold text-primary">{formatCents(founderTotalMrr)}</div>
+                    <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-base-content/50">Combined MRR</div>
+                  </div>
+                </div>
+                <div className="card bg-base-100 border border-base-300">
+                  <div className="card-body p-5">
+                    <div className={`mono-num text-2xl font-bold ${founderAvgGrowth >= 0 ? "text-yes" : "text-no"}`}>
+                      {founderAvgGrowth >= 0 ? "+" : ""}{founderAvgGrowth.toFixed(1)}%
+                    </div>
+                    <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-base-content/50">Avg Growth</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card bg-base-100 border border-base-300">
+                <div className="card-body p-5">
+                  <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-base-content/50">Startups</h3>
+                  <div className="space-y-2">
+                    {founderStartups
+                      .sort((a, b) => b.revenue.total - a.revenue.total)
+                      .map((s) => (
+                        <Link
+                          key={s.slug}
+                          href={`/startups/${s.slug}`}
+                          className="flex items-center gap-3 rounded-lg bg-base-200/50 px-3 py-2.5 transition-colors hover:bg-base-200"
+                        >
+                          {s.icon ? (
+                            <img src={s.icon} alt="" className="h-7 w-7 shrink-0 rounded object-cover" />
+                          ) : (
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-primary/10 text-[10px] font-bold text-primary">
+                              {s.name.slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] font-semibold truncate">{s.name}</div>
+                          </div>
+                          <div className="flex items-center gap-4 shrink-0">
+                            <div className="text-right">
+                              <div className="mono-num text-[13px] font-semibold">{formatCents(s.revenue.mrr)}</div>
+                              <div className="mono-num text-[10px] text-base-content/40">MRR</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="mono-num text-[13px] text-base-content/50">{formatCents(s.revenue.total)}</div>
+                              <div className="mono-num text-[10px] text-base-content/40">Total</div>
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="card bg-base-100 border border-base-300">
+                  <div className="card-body p-5">
+                    <div className="mono-num text-2xl font-bold">{formatCents(startup.revenue.mrr)}</div>
+                    <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-base-content/50">Current MRR</div>
+                  </div>
+                </div>
+                <div className="card bg-base-100 border border-base-300">
+                  <div className="card-body p-5">
+                    <div className={`mono-num text-2xl font-bold ${(startup.growth30d ?? 0) >= 0 ? "text-yes" : "text-no"}`}>
+                      {startup.growth30d !== null
+                        ? `${startup.growth30d >= 0 ? "+" : ""}${startup.growth30d.toFixed(1)}%`
+                        : "N/A"}
+                    </div>
+                    <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-base-content/50">30d Growth</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card bg-base-100 border border-base-300">
+                <div className="card-body p-5">
+                  <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-base-content/50">MRR History</h3>
+                  <MrrChart slug={startup.slug} data={mrrData} height={180} />
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="space-y-4">
