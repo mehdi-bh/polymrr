@@ -20,7 +20,8 @@ import {
 import { Credits } from "@/components/ui/credits";
 import { ShareMarketButton } from "@/components/market/share-market-button";
 import { XIcon } from "@/components/ui/x-icon";
-import { Clock, Users, ExternalLink, MessageCircle } from "lucide-react";
+import { Clock, Users, ExternalLink, MessageCircle, Activity } from "lucide-react";
+import { METRICS, type MetricId } from "@/lib/market-templates";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -96,6 +97,36 @@ export default async function MarketPage({ params }: PageProps) {
     ? founderStartups.reduce((sum, s) => sum + (s.growth30d ?? 0), 0) / founderStartups.length
     : 0;
 
+  // Current value for the tracked metric
+  const rc = market.resolutionConfig;
+  const metricDef = rc?.metric ? METRICS[rc.metric as MetricId] : null;
+  let currentValueLabel: string | null = null;
+  let currentValueFormatted: string | null = null;
+  if (rc && metricDef) {
+    currentValueLabel = `Current ${metricDef.label}`;
+    const m = rc.metric;
+    if (m === "mrr") {
+      currentValueFormatted = formatCents(startup.revenue.mrr);
+    } else if (m === "revenue_30d") {
+      currentValueFormatted = formatCents(startup.revenue.last30Days);
+    } else if (m === "revenue_total") {
+      currentValueFormatted = formatCents(startup.revenue.total);
+    } else if (m === "on_sale") {
+      currentValueFormatted = startup.onSale ? "Yes" : "No";
+    } else if (m === "founder_revenue") {
+      currentValueFormatted = formatCents(founderTotalRevenue);
+    } else if (m === "founder_startups") {
+      currentValueFormatted = String(founderStartups.length);
+    } else if (m === "founder_followers") {
+      const max = Math.max(0, ...founderStartups.map((s) => s.xFollowerCount ?? 0));
+      currentValueFormatted = max.toLocaleString();
+    } else if (m === "founder_top_startup") {
+      const sorted = [...founderStartups].sort((a, b) => b.revenue.total - a.revenue.total);
+      currentValueLabel = "Current #1";
+      currentValueFormatted = sorted[0]?.name ?? "-";
+    }
+  }
+
   return (
     <div className="space-y-6 animate-fade-up">
       {/* Market Header */}
@@ -153,7 +184,16 @@ export default async function MarketPage({ params }: PageProps) {
             )}
           </div>
 
-          <h1 className="text-2xl font-bold leading-tight">{market.question}</h1>
+          <div>
+            <h1 className="text-2xl font-bold leading-tight">{market.question}</h1>
+            {currentValueLabel && currentValueFormatted && (
+              <div className="mt-1.5 flex items-center gap-1.5 text-xs text-base-content/50">
+                <Activity className="h-3 w-3" />
+                <span>{currentValueLabel}:</span>
+                <span className="mono-num font-semibold text-base-content/70">{currentValueFormatted}</span>
+              </div>
+            )}
+          </div>
 
           <OddsBar yesOdds={market.yesOdds} size="lg" />
 
