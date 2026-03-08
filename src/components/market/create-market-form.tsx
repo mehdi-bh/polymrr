@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Credits } from "@/components/ui/credits";
 import { useToast } from "@/components/ui/toast";
@@ -27,6 +27,20 @@ import {
 } from "@/lib/market-templates";
 import { formatCents } from "@/lib/helpers";
 import type { Startup, User, Market } from "@/lib/types";
+
+interface PickerStartup {
+  slug: string;
+  name: string;
+  icon: string | null;
+  mrr: number;
+}
+
+interface PickerFounder {
+  xHandle: string;
+  xName: string | null;
+  totalFollowers: number;
+  startupCount: number;
+}
 import { QUEST_MAP } from "@/lib/quests";
 import {
   ChevronLeft,
@@ -43,6 +57,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { OddsBar } from "@/components/market/odds-bar";
+import { FounderAvatar } from "@/components/founder/founder-avatar";
 
 interface CreateMarketFormProps {
   startups: Startup[];
@@ -85,6 +100,8 @@ export function CreateMarketForm({
   // Form state
   const [startupSlug, setStartupSlug] = useState(initialStartupSlug ?? "");
   const [search, setSearch] = useState("");
+  const [pickerTab, setPickerTab] = useState<"startups" | "founders">("startups");
+  const [pickerPage, setPickerPage] = useState(1);
   const [metric, setMetric] = useState<MetricId | null>(null);
   const [condition, setCondition] = useState<ConditionId>("gte");
   const [target, setTarget] = useState("");
@@ -103,17 +120,37 @@ export function CreateMarketForm({
   // Metric list depends on mode
   const metricList = isFounderMode ? FOUNDER_METRICS : STARTUP_METRICS;
 
-  const filteredStartups = useMemo(() => {
-    if (!search) return startups.slice(0, 20);
-    const q = search.toLowerCase();
-    return startups
-      .filter(
-        (s) =>
-          s.name.toLowerCase().includes(q) ||
-          s.slug.toLowerCase().includes(q)
-      )
-      .slice(0, 20);
-  }, [startups, search]);
+  // Picker: server-side search via /api/picker
+  const [pickerStartups, setPickerStartups] = useState<PickerStartup[]>([]);
+  const [pickerFounders, setPickerFounders] = useState<PickerFounder[]>([]);
+  const [pickerTotal, setPickerTotal] = useState(0);
+  const [pickerReadyTab, setPickerReadyTab] = useState<string | null>(null);
+  const PICKER_PAGE_SIZE = 8;
+  const pickerPageCount = Math.max(1, Math.ceil(pickerTotal / PICKER_PAGE_SIZE));
+
+  // Debounced fetch — keeps stale results visible while loading
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ tab: pickerTab, page: String(pickerPage) });
+        if (search) params.set("q", search);
+        const res = await fetch(`/api/picker?${params}`);
+        const data = await res.json();
+        if (cancelled) return;
+        setPickerTotal(data.total);
+        if (pickerTab === "founders") {
+          setPickerFounders(data.founders ?? []);
+        } else {
+          setPickerStartups(data.startups ?? []);
+        }
+        setPickerReadyTab(pickerTab);
+      } catch {
+        // silent
+      }
+    }, 200);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [pickerTab, search, pickerPage]);
 
   const suggestions = useMemo(() => {
     if (isFounderMode && initialFounder) {
@@ -402,46 +439,160 @@ export function CreateMarketForm({
           </div>
         )}
 
-        {/* Step 1 — Startup (non-founder mode only) */}
+        {/* Step 1 — Pick startup or founder (non-founder mode only) */}
         {!isFounderMode && step === 1 && (
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold">Pick a startup</h2>
+            <h2 className="text-lg font-semibold">
+              {pickerTab === "startups" ? "Pick a startup" : "Pick a founder"}
+            </h2>
+
+            {/* Tabs */}
+            <div className="flex gap-1 rounded-lg bg-base-200 p-1">
+              <button
+                onClick={() => { setPickerTab("startups"); setPickerPage(1); setSearch(""); }}
+                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  pickerTab === "startups" ? "bg-base-100 text-base-content shadow-sm" : "text-base-content/50 hover:text-base-content/70"
+                }`}
+              >
+                Startups
+              </button>
+              <button
+                onClick={() => { setPickerTab("founders"); setPickerPage(1); setSearch(""); }}
+                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  pickerTab === "founders" ? "bg-base-100 text-base-content shadow-sm" : "text-base-content/50 hover:text-base-content/70"
+                }`}
+              >
+                Founders
+              </button>
+            </div>
+
             <input
               type="text"
-              placeholder="Search startups..."
+              placeholder={pickerTab === "startups" ? "Search startups..." : "Search founders..."}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPickerPage(1); }}
               className="input input-bordered w-full bg-base-200"
             />
-            <div className="grid gap-2 sm:grid-cols-2">
-              {filteredStartups.map((s) => {
-                const mc = getMarketsForSlug(s.slug).length;
-                return (
-                  <button
-                    key={s.slug}
-                    onClick={() => setStartupSlug(s.slug)}
-                    className={`btn btn-ghost justify-start gap-3 h-auto py-3 ${
-                      startupSlug === s.slug ? "btn-outline btn-primary" : ""
-                    }`}
-                  >
-                    {s.icon && (
-                      <img src={s.icon} alt="" className="h-8 w-8 rounded" />
-                    )}
-                    <div className="flex-1 text-left">
-                      <div className="font-semibold">{s.name}</div>
-                      <div className="text-xs text-base-content/50">
-                        {formatCents(s.revenue.mrr)} MRR
-                      </div>
+
+            {pickerReadyTab !== pickerTab && (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {Array.from({ length: PICKER_PAGE_SIZE }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-lg px-4 py-3 animate-pulse">
+                    <div className="h-8 w-8 shrink-0 rounded-full bg-base-300" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3.5 w-24 rounded bg-base-300" />
+                      <div className="h-2.5 w-16 rounded bg-base-300" />
                     </div>
-                    {mc > 0 && (
-                      <span className="badge badge-sm badge-primary badge-outline mono-num">
-                        {mc}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Startups grid */}
+            {pickerReadyTab === pickerTab && pickerTab === "startups" && (
+              <>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {pickerStartups.map((s) => {
+                    const mc = getMarketsForSlug(s.slug).length;
+                    return (
+                      <button
+                        key={s.slug}
+                        onClick={() => setStartupSlug(s.slug)}
+                        className={`btn btn-ghost justify-start gap-3 h-auto py-3 ${
+                          startupSlug === s.slug ? "btn-outline btn-primary" : ""
+                        }`}
+                      >
+                        {s.icon && (
+                          <img src={s.icon} alt="" className="h-8 w-8 rounded" />
+                        )}
+                        <div className="flex-1 text-left">
+                          <div className="font-semibold">{s.name}</div>
+                          <div className="text-xs text-base-content/50">
+                            {formatCents(s.mrr)} MRR
+                          </div>
+                        </div>
+                        {mc > 0 && (
+                          <span className="badge badge-sm badge-primary badge-outline mono-num">
+                            {mc}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {pickerPageCount > 1 && (
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      onClick={() => setPickerPage(pickerPage - 1)}
+                      disabled={pickerPage <= 1}
+                      className="btn btn-ghost btn-sm gap-1"
+                    >
+                      <ChevronLeft className="h-4 w-4" /> Prev
+                    </button>
+                    <span className="text-xs text-base-content/50 mono-num">
+                      {pickerPage} / {pickerPageCount}
+                    </span>
+                    <button
+                      onClick={() => setPickerPage(pickerPage + 1)}
+                      disabled={pickerPage >= pickerPageCount}
+                      className="btn btn-ghost btn-sm gap-1"
+                    >
+                      Next <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Founders grid */}
+            {pickerReadyTab === pickerTab && pickerTab === "founders" && (
+              <>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {pickerFounders.map((f) => (
+                    <Link
+                      key={f.xHandle}
+                      href={`/markets/create?founder=${f.xHandle}`}
+                      className="btn btn-ghost justify-start gap-3 h-auto py-3"
+                    >
+                      <FounderAvatar
+                        xHandle={f.xHandle}
+                        name={f.xName ?? f.xHandle}
+                        size={32}
+                      />
+                      <div className="flex-1 text-left">
+                        <div className="font-semibold">@{f.xHandle}</div>
+                        <div className="text-xs text-base-content/50">
+                          {f.totalFollowers > 0
+                            ? `${f.totalFollowers.toLocaleString()} followers`
+                            : `${f.startupCount} startup${f.startupCount !== 1 ? "s" : ""}`}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+                {pickerPageCount > 1 && (
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      onClick={() => setPickerPage(pickerPage - 1)}
+                      disabled={pickerPage <= 1}
+                      className="btn btn-ghost btn-sm gap-1"
+                    >
+                      <ChevronLeft className="h-4 w-4" /> Prev
+                    </button>
+                    <span className="text-xs text-base-content/50 mono-num">
+                      {pickerPage} / {pickerPageCount}
+                    </span>
+                    <button
+                      onClick={() => setPickerPage(pickerPage + 1)}
+                      disabled={pickerPage >= pickerPageCount}
+                      className="btn btn-ghost btn-sm gap-1"
+                    >
+                      Next <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
