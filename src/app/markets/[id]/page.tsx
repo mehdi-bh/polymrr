@@ -215,9 +215,10 @@ export default async function MarketPage({ params }: PageProps) {
             <ShareMarketButton
               question={market.question}
               startupName={isFounderMarket ? `@${market.founderXHandle}` : startup.name}
-              startupIcon={isFounderMarket ? null : startup.icon}
+              startupIcon={isFounderMarket ? `https://unavatar.io/x/${market.founderXHandle}` : startup.icon}
               yesOdds={market.yesOdds}
               marketId={market.id}
+              rounded={isFounderMarket ? "full" : "md"}
             />
           </div>
 

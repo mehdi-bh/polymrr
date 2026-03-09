@@ -85,11 +85,12 @@ export function MarketCard({ market, startup }: MarketCardProps) {
             </span>
             <ShareMarketButton
               question={market.question}
-              startupName={startup.name}
-              startupIcon={startup.icon}
+              startupName={isFounderMarket ? `@${market.founderXHandle}` : startup.name}
+              startupIcon={isFounderMarket ? `https://unavatar.io/x/${market.founderXHandle}` : startup.icon}
               yesOdds={market.yesOdds}
               marketId={market.id}
               size="sm"
+              rounded={isFounderMarket ? "full" : "md"}
             />
           </div>
         </div>

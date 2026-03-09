@@ -11,6 +11,7 @@ interface ShareMarketButtonProps {
   marketId: string;
   className?: string;
   size?: "sm" | "md";
+  rounded?: "md" | "full";
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -38,6 +39,7 @@ async function generateShareImage(
   startupName: string,
   yesOdds: number,
   startupIcon?: string | null,
+  rounded: "md" | "full" = "md",
 ): Promise<Blob> {
   const w = 1200;
   const h = 630;
@@ -68,9 +70,10 @@ async function generateShareImage(
       const img = await loadImage(startupIcon);
       const iconSize = 32;
       const iconY = nameY - iconSize + 6;
+      const iconR = rounded === "full" ? iconSize / 2 : 6;
       ctx.save();
       ctx.beginPath();
-      ctx.roundRect(60, iconY, iconSize, iconSize, 6);
+      ctx.roundRect(60, iconY, iconSize, iconSize, iconR);
       ctx.clip();
       ctx.drawImage(img, 60, iconY, iconSize, iconSize);
       ctx.restore();
@@ -157,6 +160,7 @@ export function ShareMarketButton({
   marketId,
   className,
   size = "md",
+  rounded = "md",
 }: ShareMarketButtonProps) {
   const [open, setOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -167,7 +171,7 @@ export function ShareMarketButton({
     e.preventDefault();
     e.stopPropagation();
     setOpen(true);
-    const b = await generateShareImage(question, startupName, yesOdds, startupIcon);
+    const b = await generateShareImage(question, startupName, yesOdds, startupIcon, rounded);
     setBlob(b);
     setImageUrl(URL.createObjectURL(b));
   };
