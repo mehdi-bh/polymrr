@@ -18,6 +18,8 @@ import {
   timeAgo,
 } from "@/lib/data";
 import { Credits } from "@/components/ui/credits";
+
+const MARKET_MAKER_ID = "c0000000-0000-0000-0000-000000000001";
 import { ShareMarketButton } from "@/components/market/share-market-button";
 import { XIcon } from "@/components/ui/x-icon";
 import { Clock, Users, ExternalLink, MessageCircle, Activity } from "lucide-react";
@@ -323,6 +325,9 @@ export default async function MarketPage({ params }: PageProps) {
                       return (
                         <div key={bet.id} className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
+                            {bet.userId === MARKET_MAKER_ID && (
+                              <Image src="/icon.png" alt="" width={16} height={16} className="rounded-sm" />
+                            )}
                             <Link
                               href={`/profile/${bet.userId}`}
                               className="text-[13px] font-semibold text-primary hover:underline"

@@ -3,7 +3,7 @@
 -- Add LMSR state columns to markets
 alter table markets add column if not exists yes_shares real not null default 0;
 alter table markets add column if not exists no_shares real not null default 0;
-alter table markets add column if not exists liquidity_param real not null default 500;
+alter table markets add column if not exists liquidity_param real not null default 1500;
 
 -- Add shares column to bets
 alter table bets add column if not exists shares real;

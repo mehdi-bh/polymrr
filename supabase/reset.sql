@@ -149,7 +149,7 @@ create table markets (
   yes_odds integer not null default 50 check (yes_odds between 0 and 100),
   yes_shares real not null default 0,
   no_shares real not null default 0,
-  liquidity_param real not null default 500,
+  liquidity_param real not null default 1500,
   total_credits integer not null default 0,
   total_yes_credits bigint not null default 0,
   total_no_credits bigint not null default 0,

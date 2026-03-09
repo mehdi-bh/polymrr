@@ -98,7 +98,7 @@ export async function POST(request: Request) {
       yes_odds: 50,
       yes_shares: 0,
       no_shares: 0,
-      liquidity_param: 500,
+      liquidity_param: 1500,
       total_credits: 0,
       total_bettors: 0,
       closes_at: blueprint.closesAt,
