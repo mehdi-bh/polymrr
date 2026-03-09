@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Inconsolata } from "next/font/google";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
@@ -75,6 +76,12 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
+      <Script
+          src="https://datafa.st/js/script.js"
+          data-website-id="dfid_TK8zUELoEtzSMWKG34YHi"
+          data-domain="polymrr.com"
+          strategy="afterInteractive"
+        />
       <body className={`${inconsolata.variable} font-sans antialiased flex min-h-dvh flex-col`}>
         <ToastProvider>
           <Navbar user={user} completedQuests={completedQuests} />
