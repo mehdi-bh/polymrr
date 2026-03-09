@@ -19,14 +19,31 @@ import {
   generateCriteria,
   generateSuggestions,
   generateFounderSuggestions,
-  isFounderMetric,
   type MetricId,
   type ConditionId,
   type MarketBlueprint,
   type BetSuggestion,
 } from "@/lib/market-templates";
 import { formatCents } from "@/lib/helpers";
+import { QUEST_MAP } from "@/lib/quests";
 import type { Startup, User, Market } from "@/lib/types";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Loader2,
+  Info,
+  Sparkles,
+  Pencil,
+  X,
+} from "lucide-react";
+import Link from "next/link";
+import { OddsBar } from "@/components/market/odds-bar";
+import { FounderAvatar } from "@/components/founder/founder-avatar";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface PickerStartup {
   slug: string;
@@ -42,26 +59,8 @@ interface PickerFounder {
   totalFollowers: number;
   startupCount: number;
 }
-import { QUEST_MAP } from "@/lib/quests";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  Loader2,
-  Info,
-  TrendingUp,
-  TrendingDown,
-  Users,
-  Sparkles,
-  Pencil,
-  X,
-} from "lucide-react";
-import Link from "next/link";
-import { OddsBar } from "@/components/market/odds-bar";
-import { FounderAvatar } from "@/components/founder/founder-avatar";
 
 interface CreateMarketFormProps {
-  startups: Startup[];
   user: User;
   initialStartup?: Startup;
   initialFounder?: {
@@ -71,6 +70,10 @@ interface CreateMarketFormProps {
   };
   openMarkets: Market[];
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 const CONDITION_LABELS: Record<ConditionId, string> = {
   gte: "Reach or exceed",
@@ -84,8 +87,13 @@ function isoDate(daysFromNow: number): string {
   return d.toISOString().split("T")[0];
 }
 
+const PICKER_PAGE_SIZE = 8;
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export function CreateMarketForm({
-  startups,
   user,
   initialStartup,
   initialFounder,
@@ -93,31 +101,64 @@ export function CreateMarketForm({
 }: CreateMarketFormProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [showMarkets, setShowMarkets] = useState(false);
 
   const isFounderMode = !!initialFounder;
 
-  // Form state
+  // -- Form state -----------------------------------------------------------
+
+  const [step, setStep] = useState(initialStartup || isFounderMode ? 2 : 1);
   const [startupSlug, setStartupSlug] = useState(initialStartup?.slug ?? "");
-  const [search, setSearch] = useState("");
-  const [pickerTab, setPickerTab] = useState<"startups" | "founders">("startups");
-  const [pickerPage, setPickerPage] = useState(1);
+  const [fetchedStartup, setFetchedStartup] = useState<Startup | null>(null);
   const [metric, setMetric] = useState<MetricId | null>(null);
   const [condition, setCondition] = useState<ConditionId>("gte");
   const [target, setTarget] = useState("");
   const [closesAt, setClosesAt] = useState("");
   const [seedSide, setSeedSide] = useState<"yes" | "no">("yes");
   const [seedAmount, setSeedAmount] = useState("100");
-  // For founder_top_startup: which startup is being bet on
   const [topStartupSlug, setTopStartupSlug] = useState("");
-  // For founder picker in step 1
-  const [selectedFounderHandle, setSelectedFounderHandle] = useState("");
-  // Fetched startup data (for startups picked from step 1)
-  const [fetchedStartup, setFetchedStartup] = useState<Startup | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [showMarkets, setShowMarkets] = useState(false);
 
-  // In founder mode, skip step 1 (startup picker) — go straight to metric
-  const [step, setStep] = useState(initialStartup || isFounderMode ? 2 : 1);
+  // -- Picker state ---------------------------------------------------------
+
+  const [pickerTab, setPickerTab] = useState<"startups" | "founders">("startups");
+  const [search, setSearch] = useState("");
+  const [pickerPage, setPickerPage] = useState(1);
+  const [pickerStartups, setPickerStartups] = useState<PickerStartup[]>([]);
+  const [pickerFounders, setPickerFounders] = useState<PickerFounder[]>([]);
+  const [pickerTotal, setPickerTotal] = useState(0);
+  const [pickerReady, setPickerReady] = useState(false);
+  const [selectedFounderHandle, setSelectedFounderHandle] = useState("");
+
+  const pickerPageCount = Math.max(1, Math.ceil(pickerTotal / PICKER_PAGE_SIZE));
+
+  // -- Data fetching --------------------------------------------------------
+
+  // Fetch picker results (debounced)
+  useEffect(() => {
+    if (step !== 1) return;
+    setPickerReady(false);
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ tab: pickerTab, page: String(pickerPage) });
+        if (search) params.set("q", search);
+        const res = await fetch(`/api/picker?${params}`);
+        const data = await res.json();
+        if (cancelled) return;
+        setPickerTotal(data.total);
+        if (pickerTab === "founders") {
+          setPickerFounders(data.founders ?? []);
+        } else {
+          setPickerStartups(data.startups ?? []);
+        }
+        setPickerReady(true);
+      } catch {
+        // silent
+      }
+    }, 200);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [step, pickerTab, search, pickerPage]);
 
   // Fetch full startup data when selected from picker
   useEffect(() => {
@@ -133,47 +174,16 @@ export function CreateMarketForm({
     return () => { cancelled = true; };
   }, [startupSlug, initialStartup?.slug]);
 
-  const selectedStartup = initialStartup?.slug === startupSlug
+  // -- Derived values -------------------------------------------------------
+
+  const selectedStartup: Startup | undefined = startupSlug === initialStartup?.slug
     ? initialStartup
     : fetchedStartup?.slug === startupSlug
-    ? fetchedStartup
-    : startups.find((s) => s.slug === startupSlug);
+      ? fetchedStartup
+      : undefined;
+
   const selectedMetric = metric ? METRICS[metric] : null;
-
-  // Metric list depends on mode
   const metricList = isFounderMode ? FOUNDER_METRICS : STARTUP_METRICS;
-
-  // Picker: server-side search via /api/picker
-  const [pickerStartups, setPickerStartups] = useState<PickerStartup[]>([]);
-  const [pickerFounders, setPickerFounders] = useState<PickerFounder[]>([]);
-  const [pickerTotal, setPickerTotal] = useState(0);
-  const [pickerReadyTab, setPickerReadyTab] = useState<string | null>(null);
-  const PICKER_PAGE_SIZE = 8;
-  const pickerPageCount = Math.max(1, Math.ceil(pickerTotal / PICKER_PAGE_SIZE));
-
-  // Debounced fetch — keeps stale results visible while loading
-  useEffect(() => {
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const params = new URLSearchParams({ tab: pickerTab, page: String(pickerPage) });
-        if (search) params.set("q", search);
-        const res = await fetch(`/api/picker?${params}`);
-        const data = await res.json();
-        if (cancelled) return;
-        setPickerTotal(data.total);
-        if (pickerTab === "founders") {
-          setPickerFounders(data.founders ?? []);
-        } else {
-          setPickerStartups(data.startups ?? []);
-        }
-        setPickerReadyTab(pickerTab);
-      } catch {
-        // silent
-      }
-    }, 200);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [pickerTab, search, pickerPage]);
 
   const suggestions = useMemo(() => {
     if (isFounderMode && initialFounder) {
@@ -192,11 +202,9 @@ export function CreateMarketForm({
     return val;
   }, [selectedMetric, target]);
 
-  // For founder_top_startup, the startup_slug is the one being bet on
   const effectiveStartupSlug = useMemo(() => {
     if (metric === "founder_top_startup" && topStartupSlug) return topStartupSlug;
     if (isFounderMode && initialFounder && initialFounder.startups.length > 0) {
-      // Default to top startup by revenue
       const sorted = [...initialFounder.startups].sort((a, b) => b.revenue.total - a.revenue.total);
       return sorted[0].slug;
     }
@@ -207,14 +215,12 @@ export function CreateMarketForm({
     if (isFounderMode && initialFounder) {
       return initialFounder.startups.find((s) => s.slug === effectiveStartupSlug) ?? initialFounder.startups[0];
     }
-    return startups.find((s) => s.slug === effectiveStartupSlug);
-  }, [isFounderMode, initialFounder, effectiveStartupSlug, startups]);
+    return selectedStartup;
+  }, [isFounderMode, initialFounder, effectiveStartupSlug, selectedStartup]);
 
   const blueprint: MarketBlueprint | null = useMemo(() => {
     if (!effectiveStartupSlug || !metric || !closesAt) return null;
-    // For non-boolean metrics, target must be > 0
     if (selectedMetric?.unit !== "boolean" && !targetNum) return null;
-    // For boolean metrics, target must be set
     if (selectedMetric?.unit === "boolean" && target === "") return null;
     return {
       startupSlug: effectiveStartupSlug,
@@ -241,6 +247,35 @@ export function CreateMarketForm({
   const minDate = useMemo(() => isoDate(1), []);
   const maxDate = useMemo(() => isoDate(365), []);
 
+  const founderStats = useMemo(() => {
+    if (!initialFounder) return null;
+    const s = initialFounder.startups;
+    return {
+      totalRevenue: s.reduce((sum, st) => sum + st.revenue.total, 0),
+      totalMrr: s.reduce((sum, st) => sum + st.revenue.mrr, 0),
+      totalFollowers: Math.max(0, ...s.map((st) => st.xFollowerCount ?? 0)),
+      startupCount: s.length,
+    };
+  }, [initialFounder]);
+
+  const relatedMarkets = useMemo(() => {
+    if (isFounderMode && initialFounder) {
+      const founderSlugs = new Set(initialFounder.startups.map((s) => s.slug));
+      return openMarkets.filter(
+        (m) => m.founderXHandle === initialFounder.xHandle || founderSlugs.has(m.startupSlug)
+      );
+    }
+    if (startupSlug) {
+      return openMarkets.filter((m) => m.startupSlug === startupSlug);
+    }
+    return [];
+  }, [isFounderMode, initialFounder, startupSlug, openMarkets]);
+
+  const getMarketsForSlug = (slug: string) =>
+    openMarkets.filter((m) => m.startupSlug === slug);
+
+  // -- Actions --------------------------------------------------------------
+
   const canProceed = () => {
     switch (step) {
       case 1: return pickerTab === "founders" ? !!selectedFounderHandle : !!startupSlug;
@@ -263,12 +298,9 @@ export function CreateMarketForm({
       setTarget(String(s.target / 100));
     } else if (m.unit === "percent") {
       setTarget(String(s.target * 100));
-    } else if (m.unit === "boolean") {
-      setTarget(String(s.target));
     } else {
       setTarget(String(s.target));
     }
-    // For founder_top_startup, auto-select the top startup
     if (s.metric === "founder_top_startup" && initialFounder) {
       const sorted = [...initialFounder.startups].sort((a, b) => b.revenue.total - a.revenue.total);
       setTopStartupSlug(sorted[0].slug);
@@ -277,7 +309,32 @@ export function CreateMarketForm({
     setStep(4);
   }
 
-  const handleSubmit = async () => {
+  function handleBack() {
+    if ((isFounderMode || initialStartup) && step === 2) {
+      router.push("/markets/create");
+      return;
+    }
+    setStep(step - 1);
+  }
+
+  function handleNext() {
+    if (step === 1 && pickerTab === "founders" && selectedFounderHandle) {
+      router.push(`/markets/create?founder=${selectedFounderHandle}`);
+      return;
+    }
+    setStep(step + 1);
+  }
+
+  function handleChangeStartup() {
+    setStep(1);
+    setStartupSlug("");
+    setFetchedStartup(null);
+    setMetric(null);
+    setTarget("");
+    setClosesAt("");
+  }
+
+  async function handleSubmit() {
     if (!blueprint) return;
     setLoading(true);
     try {
@@ -297,49 +354,19 @@ export function CreateMarketForm({
       } else {
         toast("success", "Market created", "Your seed bet has been placed");
       }
-
-      // Quest completion toasts
       const completedQuests: string[] = data.completedQuests ?? [];
       for (const qid of completedQuests) {
         const q = QUEST_MAP.get(qid);
         if (q) toast("quest", "Quest completed!", `${q.label} — +${q.reward.toLocaleString()} bananas`);
       }
-
       router.push(`/markets/${data.id}`);
     } catch {
       toast("error", "Something went wrong", "Please try again");
       setLoading(false);
     }
-  };
+  }
 
-  // Founder context card stats
-  const founderStats = useMemo(() => {
-    if (!initialFounder) return null;
-    const s = initialFounder.startups;
-    return {
-      totalRevenue: s.reduce((sum, st) => sum + st.revenue.total, 0),
-      totalMrr: s.reduce((sum, st) => sum + st.revenue.mrr, 0),
-      totalFollowers: Math.max(0, ...s.map((st) => st.xFollowerCount ?? 0)),
-      startupCount: s.length,
-    };
-  }, [initialFounder]);
-
-  // Active markets for the selected startup or founder
-  const relatedMarkets = useMemo(() => {
-    if (isFounderMode && initialFounder) {
-      const founderSlugs = new Set(initialFounder.startups.map((s) => s.slug));
-      return openMarkets.filter(
-        (m) => m.founderXHandle === initialFounder.xHandle || founderSlugs.has(m.startupSlug)
-      );
-    }
-    if (startupSlug) {
-      return openMarkets.filter((m) => m.startupSlug === startupSlug);
-    }
-    return [];
-  }, [isFounderMode, initialFounder, startupSlug, openMarkets]);
-
-  const getMarketsForSlug = (slug: string) =>
-    openMarkets.filter((m) => m.startupSlug === slug);
+  // -- Render ---------------------------------------------------------------
 
   return (
     <TooltipProvider>
@@ -358,7 +385,7 @@ export function CreateMarketForm({
           ))}
         </div>
 
-        {/* Founder context card — visible in founder mode on all steps */}
+        {/* Founder context card */}
         {isFounderMode && initialFounder && founderStats && step >= 2 && (
           <div className="card bg-base-200/50 border border-base-300">
             <div className="card-body flex-row items-center gap-4 p-4">
@@ -391,16 +418,12 @@ export function CreateMarketForm({
           </div>
         )}
 
-        {/* Startup context card — visible on all steps after selection (non-founder mode) */}
+        {/* Startup context card */}
         {!isFounderMode && selectedStartup && step > 1 && (
           <div className="card bg-base-200/50 border border-base-300">
             <div className="card-body flex-row items-center gap-4 p-4">
               {selectedStartup.icon ? (
-                <img
-                  src={selectedStartup.icon}
-                  alt=""
-                  className="h-10 w-10 rounded-lg"
-                />
+                <img src={selectedStartup.icon} alt="" className="h-10 w-10 rounded-lg" />
               ) : (
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
                   {selectedStartup.name.slice(0, 2).toUpperCase()}
@@ -412,27 +435,8 @@ export function CreateMarketForm({
                   <span className="mono-num font-semibold text-base-content/70">
                     {formatCents(selectedStartup.revenue.mrr)} MRR
                   </span>
-                  <span className="flex items-center gap-0.5">
-                    {(selectedStartup.growth30d ?? 0) >= 0 ? (
-                      <TrendingUp className="h-3 w-3 text-yes" />
-                    ) : (
-                      <TrendingDown className="h-3 w-3 text-no" />
-                    )}
-                    <span
-                      className={`mono-num ${
-                        (selectedStartup.growth30d ?? 0) >= 0
-                          ? "text-yes"
-                          : "text-no"
-                      }`}
-                    >
-                      {selectedStartup.growth30d !== null
-                        ? `${selectedStartup.growth30d.toFixed(1)}%/mo`
-                        : "N/A"}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-0.5">
-                    <Users className="h-3 w-3" />
-                    {selectedStartup.customers.toLocaleString()}
+                  <span className="mono-num">
+                    {formatCents(selectedStartup.revenue.total)} total
                   </span>
                 </div>
               </div>
@@ -445,16 +449,7 @@ export function CreateMarketForm({
                     {relatedMarkets.length} active market{relatedMarkets.length !== 1 ? "s" : ""}
                   </button>
                 )}
-                <button
-                  onClick={() => {
-                    setStep(1);
-                    setStartupSlug("");
-                    setMetric(null);
-                    setTarget("");
-                    setClosesAt("");
-                  }}
-                  className="btn btn-ghost btn-xs"
-                >
+                <button onClick={handleChangeStartup} className="btn btn-ghost btn-xs">
                   Change
                 </button>
               </div>
@@ -462,7 +457,7 @@ export function CreateMarketForm({
           </div>
         )}
 
-        {/* Step 1 — Pick startup or founder (non-founder mode only) */}
+        {/* Step 1 — Pick startup or founder */}
         {!isFounderMode && step === 1 && (
           <div className="space-y-3">
             <h2 className="text-lg font-semibold">
@@ -497,7 +492,8 @@ export function CreateMarketForm({
               className="input input-bordered w-full bg-base-200"
             />
 
-            {pickerReadyTab !== pickerTab && (
+            {/* Loading skeleton */}
+            {!pickerReady && (
               <div className="grid gap-2 sm:grid-cols-2">
                 {Array.from({ length: PICKER_PAGE_SIZE }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 rounded-lg px-4 py-3 animate-pulse">
@@ -511,8 +507,8 @@ export function CreateMarketForm({
               </div>
             )}
 
-            {/* Pagination — above grids */}
-            {pickerReadyTab === pickerTab && pickerPageCount > 1 && (
+            {/* Pagination */}
+            {pickerReady && pickerPageCount > 1 && (
               <div className="flex items-center justify-between">
                 <button
                   onClick={() => setPickerPage(pickerPage - 1)}
@@ -535,7 +531,7 @@ export function CreateMarketForm({
             )}
 
             {/* Startups grid */}
-            {pickerReadyTab === pickerTab && pickerTab === "startups" && (
+            {pickerReady && pickerTab === "startups" && (
               <div className="grid gap-2 sm:grid-cols-2">
                 {pickerStartups.map((s) => {
                   const mc = getMarketsForSlug(s.slug).length;
@@ -568,7 +564,7 @@ export function CreateMarketForm({
             )}
 
             {/* Founders grid */}
-            {pickerReadyTab === pickerTab && pickerTab === "founders" && (
+            {pickerReady && pickerTab === "founders" && (
               <div className="grid gap-2 sm:grid-cols-2">
                 {pickerFounders.map((f) => (
                   <button
@@ -601,7 +597,6 @@ export function CreateMarketForm({
         {/* Step 2 — Suggestions + Metric picker */}
         {step === 2 && (isFounderMode || selectedStartup) && (
           <div className="space-y-5">
-            {/* Suggestions */}
             {suggestions.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
@@ -617,9 +612,7 @@ export function CreateMarketForm({
                     >
                       <div className="text-left">
                         <div className="font-semibold">{s.label}</div>
-                        <div className="text-xs text-base-content/50">
-                          {s.description}
-                        </div>
+                        <div className="text-xs text-base-content/50">{s.description}</div>
                       </div>
                     </button>
                   ))}
@@ -627,7 +620,6 @@ export function CreateMarketForm({
               </div>
             )}
 
-            {/* Custom metric picker */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Pencil className="h-4 w-4 text-base-content/50" />
@@ -654,10 +646,7 @@ export function CreateMarketForm({
                       </div>
                     </div>
                     <Tooltip>
-                      <TooltipTrigger
-                        asChild
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <Info className="h-3.5 w-3.5 shrink-0 text-base-content/30 hover:text-base-content/60" />
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-[200px]">
@@ -676,7 +665,6 @@ export function CreateMarketForm({
           <div className="space-y-4">
             <h2 className="text-lg font-semibold">Set the target</h2>
 
-            {/* founder_top_startup: show startup picker */}
             {metric === "founder_top_startup" && initialFounder ? (
               <div className="space-y-3">
                 <p className="text-sm text-base-content/50">
@@ -716,7 +704,7 @@ export function CreateMarketForm({
               </div>
             ) : (
               <>
-                {/* Current value hint for founder metrics */}
+                {/* Current value hints */}
                 {metric === "founder_revenue" && initialFounder && (
                   <div className="text-sm text-base-content/50">
                     Current total revenue:{" "}
@@ -741,8 +729,6 @@ export function CreateMarketForm({
                     </span>
                   </div>
                 )}
-
-                {/* Current value hint for startup metrics */}
                 {!isFounderMode && selectedMetric.unit === "cents" && selectedStartup && (
                   <div className="text-sm text-base-content/50">
                     Current {selectedMetric.label}:{" "}
@@ -753,6 +739,7 @@ export function CreateMarketForm({
                     </span>
                   </div>
                 )}
+
                 {selectedMetric.unit !== "boolean" ? (
                   <>
                     <div className="flex gap-2">
@@ -761,9 +748,7 @@ export function CreateMarketForm({
                           key={c}
                           onClick={() => setCondition(c)}
                           className={`btn btn-sm flex-1 ${
-                            condition === c
-                              ? "btn-primary"
-                              : "btn-ghost border-base-300"
+                            condition === c ? "btn-primary" : "btn-ghost border-base-300"
                           }`}
                         >
                           {CONDITION_LABELS[c]}
@@ -772,17 +757,13 @@ export function CreateMarketForm({
                     </div>
                     <div className="relative">
                       {selectedMetric.unit === "cents" && (
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50">
-                          $
-                        </span>
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50">$</span>
                       )}
                       <input
                         type="number"
                         placeholder={
-                          selectedMetric.unit === "cents"
-                            ? "e.g. 5000"
-                            : selectedMetric.unit === "percent"
-                            ? "e.g. 20"
+                          selectedMetric.unit === "cents" ? "e.g. 5000"
+                            : selectedMetric.unit === "percent" ? "e.g. 20"
                             : "e.g. 100"
                         }
                         value={target}
@@ -792,33 +773,21 @@ export function CreateMarketForm({
                         }`}
                       />
                       {selectedMetric.unit === "percent" && (
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/50">
-                          %
-                        </span>
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/50">%</span>
                       )}
                     </div>
                   </>
                 ) : selectedMetric.id === "on_sale" ? (
                   <div className="flex gap-2">
                     <button
-                      onClick={() => {
-                        setTarget("1");
-                        setCondition("eq");
-                      }}
-                      className={`btn flex-1 ${
-                        target === "1" ? "btn-primary" : "btn-ghost border-base-300"
-                      }`}
+                      onClick={() => { setTarget("1"); setCondition("eq"); }}
+                      className={`btn flex-1 ${target === "1" ? "btn-primary" : "btn-ghost border-base-300"}`}
                     >
                       Yes (listed for sale)
                     </button>
                     <button
-                      onClick={() => {
-                        setTarget("0");
-                        setCondition("eq");
-                      }}
-                      className={`btn flex-1 ${
-                        target === "0" ? "btn-primary" : "btn-ghost border-base-300"
-                      }`}
+                      onClick={() => { setTarget("0"); setCondition("eq"); }}
+                      className={`btn flex-1 ${target === "0" ? "btn-primary" : "btn-ghost border-base-300"}`}
                     >
                       No (not for sale)
                     </button>
@@ -845,9 +814,7 @@ export function CreateMarketForm({
                   key={opt.days}
                   onClick={() => setClosesAt(isoDate(opt.days))}
                   className={`btn btn-sm ${
-                    closesAt === isoDate(opt.days)
-                      ? "btn-primary"
-                      : "btn-ghost border-base-300"
+                    closesAt === isoDate(opt.days) ? "btn-primary" : "btn-ghost border-base-300"
                   }`}
                 >
                   {opt.label}
@@ -870,25 +837,18 @@ export function CreateMarketForm({
           <div className="space-y-4">
             <h2 className="text-lg font-semibold">Place your seed bet</h2>
             <p className="text-sm text-base-content/60">
-              Every market needs a first bet to get started. Which side are you
-              on?
+              Every market needs a first bet to get started. Which side are you on?
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setSeedSide("yes")}
-                className={`btn mono-num ${
-                  seedSide === "yes"
-                    ? "btn-success"
-                    : "btn-ghost border-base-300"
-                }`}
+                className={`btn mono-num ${seedSide === "yes" ? "btn-success" : "btn-ghost border-base-300"}`}
               >
                 YES
               </button>
               <button
                 onClick={() => setSeedSide("no")}
-                className={`btn mono-num ${
-                  seedSide === "no" ? "btn-error" : "btn-ghost border-base-300"
-                }`}
+                className={`btn mono-num ${seedSide === "no" ? "btn-error" : "btn-ghost border-base-300"}`}
               >
                 NO
               </button>
@@ -924,29 +884,14 @@ export function CreateMarketForm({
         {/* Navigation */}
         <div className="flex gap-3">
           {step > 1 && (
-            <button
-              onClick={() => {
-                if ((isFounderMode || initialStartup) && step === 2) {
-                  router.push("/markets/create");
-                  return;
-                }
-                setStep(step - 1);
-              }}
-              className="btn btn-ghost gap-1"
-            >
+            <button onClick={handleBack} className="btn btn-ghost gap-1">
               <ChevronLeft className="h-4 w-4" /> Back
             </button>
           )}
           <div className="flex-1" />
           {step < 5 ? (
             <button
-              onClick={() => {
-                if (step === 1 && pickerTab === "founders" && selectedFounderHandle) {
-                  router.push(`/markets/create?founder=${selectedFounderHandle}`);
-                  return;
-                }
-                setStep(step + 1);
-              }}
+              onClick={handleNext}
               disabled={!canProceed()}
               className="btn btn-primary gap-1"
             >
@@ -955,16 +900,10 @@ export function CreateMarketForm({
           ) : (
             <button
               onClick={handleSubmit}
-              disabled={
-                loading ||
-                !blueprint ||
-                (parseInt(seedAmount) || 0) > user.credits
-              }
+              disabled={loading || !blueprint || (parseInt(seedAmount) || 0) > user.credits}
               className="btn btn-primary gap-2"
             >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : null}
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {loading ? "Creating..." : "Create Market"}
             </button>
           )}
