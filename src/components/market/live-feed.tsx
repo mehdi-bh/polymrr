@@ -27,18 +27,16 @@ export function LiveFeed({ items }: LiveFeedProps) {
             href={`/markets/${item.marketId}`}
             className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-base-300/30 sm:px-5"
           >
-            <span className={`mono-num badge badge-sm w-11 shrink-0 ${
-              item.side === "yes" ? "badge-success badge-outline" : "badge-error badge-outline"
-            }`}>
-              {item.side.toUpperCase()}
-            </span>
             <div className="min-w-0 flex-1 truncate text-xs text-base-content/50">
-              {(item.userXHandle || item.userName) && (
-                <span className="hidden font-semibold text-primary sm:inline">
-                  {item.userXHandle ? `@${item.userXHandle}` : item.userName}{" "}
-                </span>
-              )}
-              {item.startupName} &middot; &quot;{item.marketQuestion}&quot;
+              <span className="font-semibold text-base-content/80">
+                {item.userXHandle ? `@${item.userXHandle}` : item.userName || "Anonymous"}
+              </span>
+              {" "}bet{" "}
+              <span className={`font-bold ${item.side === "yes" ? "text-success" : "text-error"}`}>
+                {item.side.toUpperCase()}
+              </span>
+              {" "}on{" "}
+              <span className="text-base-content/70">&quot;{item.marketQuestion}&quot;</span>
             </div>
             <div className="flex shrink-0 items-center gap-2 text-xs text-base-content/40">
               <Credits amount={item.amount} size="xs" className="font-medium text-base-content/60" />
