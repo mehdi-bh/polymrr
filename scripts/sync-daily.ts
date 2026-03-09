@@ -17,6 +17,7 @@ import {
   updateProgress,
   isCancelled,
 } from "@/lib/trustmrr";
+import { getFollowerCount } from "@/lib/twitter/client";
 
 const PAGE_SIZE = 50;
 
@@ -77,6 +78,34 @@ async function main() {
     }
 
     console.log(`[sync-daily] Done: ${synced} synced (${newCount} new)`);
+
+    // Sync follower counts from twitterapi.io
+    if (process.env.TWITTER_API_KEY) {
+      if (logId) lines = await updateProgress(admin, logId, synced, total, "Syncing follower counts...", lines);
+
+      const { data: handleRows } = await admin
+        .from("startups")
+        .select("x_handle")
+        .not("x_handle", "is", null);
+
+      const handles = [...new Set((handleRows ?? []).map((r) => r.x_handle as string))];
+      let followersUpdated = 0;
+
+      for (const handle of handles) {
+        try {
+          const count = await getFollowerCount(handle);
+          if (count !== null) {
+            await admin.from("startups").update({ x_follower_count: count }).eq("x_handle", handle);
+            followersUpdated++;
+          }
+        } catch {
+          // non-fatal, skip
+        }
+      }
+
+      console.log(`[sync-daily] Followers: ${followersUpdated}/${handles.length} updated`);
+      if (logId) lines = await updateProgress(admin, logId, synced, total, `Followers: ${followersUpdated}/${handles.length} updated`, lines);
+    }
 
     if (logId) {
       await updateSyncLog(admin, logId, "completed", {
