@@ -113,7 +113,7 @@ export function BetForm({ marketId, yesOdds, yesShares, noShares, liquidityParam
         />
         {preview && (
           <div className="space-y-1.5 text-xs text-base-content/50">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-1">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>

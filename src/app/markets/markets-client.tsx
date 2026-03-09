@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, type ReactNode } from "react";
 import { FilterSelect, type FilterOption } from "@/components/ui/filter-select";
@@ -8,7 +9,7 @@ import type { MarketType, MarketStatus, TrustMRRCategory } from "@/lib/types";
 import {
   CircleDot, Clock, CheckCircle2, Target, Handshake,
   Sparkles, Code2, ShoppingCart, Blocks, BarChart3, Pen, Share2, Flame,
-  CalendarPlus, Coins, ArrowUpCircle, ArrowDownCircle, Layers, Bot,
+  CalendarPlus, Coins, ArrowUpCircle, ArrowDownCircle, Layers, Bot, Plus,
 } from "lucide-react";
 
 const statusOptions: FilterOption[] = [
@@ -47,10 +48,11 @@ const categoryOptions: FilterOption[] = [
 
 interface MarketsFiltersProps {
   filters: { status: string; type: string; category: string; sort: string; search: string };
+  showCreateButton?: boolean;
   children: ReactNode;
 }
 
-export function MarketsFilters({ filters, children }: MarketsFiltersProps) {
+export function MarketsFilters({ filters, showCreateButton, children }: MarketsFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -80,7 +82,15 @@ export function MarketsFilters({ filters, children }: MarketsFiltersProps) {
 
   return (
     <div className="space-y-6 animate-fade-up">
-      <h1 className="text-2xl font-bold">Markets</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Markets</h1>
+        {showCreateButton && (
+          <Link href="/markets/create" className="btn btn-primary btn-sm gap-1.5">
+            <Plus className="h-4 w-4" />
+            Create Market
+          </Link>
+        )}
+      </div>
 
       <SearchInput
         value={filters.search}

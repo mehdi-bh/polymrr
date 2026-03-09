@@ -1,12 +1,10 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getMarketsPaginated, getCurrentUser } from "@/lib/data";
 import { MarketsFilters } from "./markets-client";
 import { MarketCard } from "@/components/market/market-card";
 import { Pagination } from "@/components/ui/pagination";
 import { CardGridSkeleton } from "@/components/ui/card-skeleton";
-import { Plus } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Markets",
@@ -35,21 +33,11 @@ export default async function MarketsPage({ searchParams }: Props) {
   const user = await getCurrentUser();
 
   return (
-    <div className="space-y-4">
-      {user && (
-        <div className="flex justify-end">
-          <Link href="/markets/create" className="btn btn-primary btn-sm gap-1.5">
-            <Plus className="h-4 w-4" />
-            Create Market
-          </Link>
-        </div>
-      )}
-      <MarketsFilters filters={filters}>
-        <Suspense key={key} fallback={<CardGridSkeleton variant="market" />}>
-          <MarketsResults filters={filters} page={page} />
-        </Suspense>
-      </MarketsFilters>
-    </div>
+    <MarketsFilters filters={filters} showCreateButton={!!user}>
+      <Suspense key={key} fallback={<CardGridSkeleton variant="market" />}>
+        <MarketsResults filters={filters} page={page} />
+      </Suspense>
+    </MarketsFilters>
   );
 }
 

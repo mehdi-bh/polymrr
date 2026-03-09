@@ -52,10 +52,10 @@ export function LeaderboardClient({ entries, page }: LeaderboardClientProps) {
               <th className="text-[10px] font-bold uppercase tracking-wider text-base-content/50">Rank</th>
               <th className="text-[10px] font-bold uppercase tracking-wider text-base-content/50">Predictor</th>
               <th className="text-right text-[10px] font-bold uppercase tracking-wider text-base-content/50">Win Rate</th>
-              <th className="text-right text-[10px] font-bold uppercase tracking-wider text-base-content/50">Predictions</th>
+              <th className="hidden sm:table-cell text-right text-[10px] font-bold uppercase tracking-wider text-base-content/50">Predictions</th>
               <th className="text-right text-[10px] font-bold uppercase tracking-wider text-base-content/50">Won</th>
-              <th className="text-right text-[10px] font-bold uppercase tracking-wider text-base-content/50">Lost</th>
-              <th className="text-center text-[10px] font-bold uppercase tracking-wider text-base-content/50">Streak</th>
+              <th className="hidden sm:table-cell text-right text-[10px] font-bold uppercase tracking-wider text-base-content/50">Lost</th>
+              <th className="hidden sm:table-cell text-center text-[10px] font-bold uppercase tracking-wider text-base-content/50">Streak</th>
             </tr>
           </thead>
           <tbody>
@@ -88,16 +88,16 @@ export function LeaderboardClient({ entries, page }: LeaderboardClientProps) {
                       {entry.winRate}%
                     </span>
                   </td>
-                  <td className="text-right mono-num text-base-content/50">
+                  <td className="hidden sm:table-cell text-right mono-num text-base-content/50">
                     {entry.totalPredictions}
                   </td>
                   <td className="text-right font-medium text-yes">
                     <Credits amount={entry.creditsWon} prefix="+" size="xs" />
                   </td>
-                  <td className="text-right font-medium text-no">
+                  <td className="hidden sm:table-cell text-right font-medium text-no">
                     <Credits amount={entry.creditsLost} prefix="-" size="xs" />
                   </td>
-                  <td className="text-center">
+                  <td className="hidden sm:table-cell text-center">
                     {entry.currentStreak >= 5 ? (
                       <span className="badge badge-warning badge-outline badge-sm gap-1">
                         <Flame className="h-3 w-3" />

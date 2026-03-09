@@ -89,9 +89,9 @@ export function EditableAvatar({ user, googleAvatarUrl }: EditableAvatarProps) {
         className="group relative rounded-2xl overflow-hidden"
       >
         {activeAvatar ? (
-          <img src={activeAvatar} alt={user.xName} className="h-14 w-14 rounded-2xl object-cover" />
+          <img src={activeAvatar} alt={user.xName} className="h-18 w-18 rounded-2xl object-cover" />
         ) : (
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-lg font-bold text-primary">
+          <div className="flex h-18 w-18 items-center justify-center rounded-2xl bg-primary/10 text-2xl font-bold text-primary">
             {user.xName.slice(0, 2).toUpperCase()}
           </div>
         )}
@@ -223,10 +223,10 @@ export function EditableName({ user }: EditableNameProps) {
     return (
       <button
         onClick={() => setEditing(true)}
-        className="group flex items-center gap-1.5"
+        className="group relative flex items-center gap-1.5"
       >
-        <h1 className="text-xl font-bold truncate">{user.xName}</h1>
-        <Pencil className="h-3 w-3 text-base-content/40 opacity-0 group-hover:opacity-60 transition-opacity" />
+        <h1 className="text-2xl font-bold truncate">{user.xName}</h1>
+        <Pencil className="h-3 w-3 text-base-content/40 opacity-0 group-hover:opacity-60 transition-opacity absolute -right-5" />
       </button>
     );
   }
@@ -319,11 +319,11 @@ export function EditableXHandle({ user }: EditableXHandleProps) {
       return (
         <button
           onClick={() => setEditing(true)}
-          className="group flex items-center gap-1.5 text-sm font-medium text-base-content/60 hover:text-base-content transition-colors"
+          className="group relative flex items-center gap-1.5 text-sm font-medium text-base-content/60 hover:text-base-content transition-colors"
         >
           <XIcon size={14} />
           <span>@{user.xHandle}</span>
-          <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+          <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity absolute -right-5" />
         </button>
       );
     }

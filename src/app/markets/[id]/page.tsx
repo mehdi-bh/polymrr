@@ -132,54 +132,53 @@ export default async function MarketPage({ params }: PageProps) {
       {/* Market Header */}
       <div className="card bg-base-100 border border-base-300">
         <div className="card-body gap-5 p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {isFounderMarket ? (
-                <a
-                  href={`https://x.com/${market.founderXHandle}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2.5 transition-colors hover:text-primary"
-                >
-                  <FounderAvatar
-                    xHandle={market.founderXHandle!}
-                    name={market.founderXHandle!}
-                    size={40}
-                  />
-                  <span className="font-semibold">@{market.founderXHandle}</span>
-                  <XIcon size={14} className="text-base-content/50" />
-                </a>
-              ) : (
-                <Link href={`/startups/${startup.slug}`} className="flex items-center gap-2.5 transition-colors hover:text-primary">
-                  {startup.icon ? (
-                    <img src={startup.icon} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
-                  ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-                      {startup.name.slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
-                  <span className="font-semibold">{startup.name}</span>
-                  <ExternalLink className="h-3.5 w-3.5 text-base-content/50" />
-                </Link>
-              )}
-              <span className="badge badge-neutral badge-sm">{typeLabels[market.type]}</span>
-              {market.status === "resolved" && (
-                <span className={`badge badge-sm ${
-                  market.resolvedOutcome === "yes" ? "badge-success badge-outline" : "badge-error badge-outline"
-                }`}>
-                  Resolved {market.resolvedOutcome?.toUpperCase()}
-                </span>
-              )}
-            </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {isFounderMarket ? (
+              <a
+                href={`https://x.com/${market.founderXHandle}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2.5 transition-colors hover:text-primary"
+              >
+                <FounderAvatar
+                  xHandle={market.founderXHandle!}
+                  name={market.founderXHandle!}
+                  size={40}
+                />
+                <span className="font-semibold">@{market.founderXHandle}</span>
+                <XIcon size={14} className="text-base-content/50" />
+              </a>
+            ) : (
+              <Link href={`/startups/${startup.slug}`} className="flex items-center gap-2.5 transition-colors hover:text-primary">
+                {startup.icon ? (
+                  <img src={startup.icon} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                    {startup.name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <span className="font-semibold">{startup.name}</span>
+                <ExternalLink className="h-3.5 w-3.5 text-base-content/50" />
+              </Link>
+            )}
+            <span className="badge badge-neutral badge-sm">{typeLabels[market.type]}</span>
+            {market.status === "resolved" && (
+              <span className={`badge badge-sm ${
+                market.resolvedOutcome === "yes" ? "badge-success badge-outline" : "badge-error badge-outline"
+              }`}>
+                Resolved {market.resolvedOutcome?.toUpperCase()}
+              </span>
+            )}
             {!isFounderMarket && (startup.xHandle || startup.cofounders?.[0]?.xHandle) && (
               <a
                 href={`https://x.com/${startup.xHandle || startup.cofounders[0].xHandle}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn btn-sm gap-1.5 border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50"
+                className="btn btn-sm gap-1.5 border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50 ml-auto"
               >
                 <MessageCircle className="h-3.5 w-3.5" />
-                Reach out to Founder
+                <span className="hidden sm:inline">Reach out to Founder</span>
+                <span className="sm:hidden">Contact</span>
               </a>
             )}
           </div>
@@ -197,8 +196,8 @@ export default async function MarketPage({ params }: PageProps) {
 
           <OddsBar yesOdds={market.yesOdds} size="lg" />
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6 text-sm text-base-content/50">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-4 text-sm text-base-content/50">
               <span className="inline-flex items-center gap-1"><Credits amount={market.totalCredits} /> pool</span>
               <span className="flex items-center gap-1.5">
                 <Users className="h-4 w-4" />

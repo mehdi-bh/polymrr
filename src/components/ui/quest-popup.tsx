@@ -49,7 +49,7 @@ export function QuestPopup({ credits, completedQuests }: QuestPopupProps) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[320px] z-[100] animate-fade-up">
+        <div className="absolute right-0 top-full mt-2 w-[min(320px,calc(100vw-32px))] z-[100] animate-fade-up">
           {/* Arrow */}
           <div className="absolute -top-1.5 right-4 h-3 w-3 rotate-45 bg-base-100 border-l border-t border-base-300" />
 

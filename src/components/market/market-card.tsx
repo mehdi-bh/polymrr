@@ -26,8 +26,8 @@ export function MarketCard({ market, startup }: MarketCardProps) {
       className="card-hover card bg-base-100 border border-base-300"
     >
       <div className="card-body gap-3 p-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
             {isFounderMarket ? (
               <>
                 <FounderAvatar
@@ -35,19 +35,19 @@ export function MarketCard({ market, startup }: MarketCardProps) {
                   name={market.founderXHandle!}
                   size={36}
                 />
-                <span className="text-sm font-semibold">@{market.founderXHandle}</span>
-                <XIcon size={12} className="text-base-content/50" />
+                <span className="text-sm font-semibold truncate">@{market.founderXHandle}</span>
+                <XIcon size={12} className="shrink-0 text-base-content/50" />
               </>
             ) : (
               <>
                 {startup.icon ? (
-                  <img src={startup.icon} alt={startup.name} className="h-9 w-9 rounded-lg object-cover" />
+                  <img src={startup.icon} alt={startup.name} className="h-9 w-9 shrink-0 rounded-lg object-cover" />
                 ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
                     {startup.name.slice(0, 2).toUpperCase()}
                   </div>
                 )}
-                <div>
+                <div className="min-w-0">
                   <span className="text-sm font-semibold">{startup.name}</span>
                   <span className="mono-num ml-2 text-xs text-base-content/50">
                     {formatCents(startup.revenue.mrr)}
@@ -56,7 +56,7 @@ export function MarketCard({ market, startup }: MarketCardProps) {
               </>
             )}
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex shrink-0 gap-1.5">
             {startup.onSale && (
               <span className="badge badge-warning badge-sm badge-outline">FOR SALE</span>
             )}

@@ -78,3 +78,16 @@
   from { width: 100%; }
   to { width: 0%; }
 }
+
+/* Home page grid: mobile stacks Featured→Stats→Feed, desktop shows Stats full-width then Feed|Featured */
+.home-grid {
+  display: grid;
+  gap: 2rem;
+  grid-template-areas: "featured" "stats" "feed";
+}
+@media (min-width: 1024px) {
+  .home-grid {
+    grid-template-columns: 3fr 2fr;
+    grid-template-areas: "stats stats" "feed featured";
+  }
+}

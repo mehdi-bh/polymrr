@@ -69,16 +69,16 @@ export default async function StartupPage({ params }: PageProps) {
             </div>
           )}
 
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-4">
               {startup.icon ? (
-                <img src={startup.icon} alt={startup.name} className="h-14 w-14 rounded-xl object-cover" />
+                <img src={startup.icon} alt={startup.name} className="h-14 w-14 shrink-0 rounded-xl object-cover" />
               ) : (
-                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-lg font-bold text-primary">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg font-bold text-primary">
                   {startup.name.slice(0, 2).toUpperCase()}
                 </div>
               )}
-              <div>
+              <div className="min-w-0">
                 <h1 className="text-2xl font-bold">{startup.name}</h1>
                 <p className="mt-0.5 text-sm text-base-content/50">{startup.description}</p>
               </div>
@@ -92,7 +92,7 @@ export default async function StartupPage({ params }: PageProps) {
             </Link>
           </div>
 
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div>
               <div className="mono-num text-2xl font-bold">{startup.revenue.total > 0 ? formatCents(startup.revenue.total) : "-"}</div>
               <div className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-base-content/50">

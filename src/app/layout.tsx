@@ -78,7 +78,7 @@ export default async function RootLayout({
       <body className={`${inconsolata.variable} font-sans antialiased flex min-h-dvh flex-col`}>
         <ToastProvider>
           <Navbar user={user} completedQuests={completedQuests} />
-          <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">{children}</main>
+          <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 pb-20 md:pb-8">{children}</main>
           <Footer />
         </ToastProvider>
       </body>

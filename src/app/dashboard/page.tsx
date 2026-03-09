@@ -88,7 +88,7 @@ export default async function DashboardPage() {
                 <Link key={bet.id} href={`/markets/${market.id}`}
                   className="block rounded-xl border border-base-300 bg-base-100 p-4 transition-colors hover:bg-base-300/30">
                   {/* Row 1: Question + bet amount */}
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-[13px] font-semibold leading-tight">{market.question}</div>
                       <div className="mt-0.5 text-xs text-base-content/50">
@@ -109,7 +109,7 @@ export default async function DashboardPage() {
                   <OddsBar yesOdds={market.yesOdds} size="sm" className="mt-2.5" />
 
                   {/* Row 3: Stats */}
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-base-content/50">
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-base-content/50">
                     <div className="flex items-center gap-3">
                       <span>Est. payout: <Credits amount={estPayout} className={`font-semibold ${estProfit >= 0 ? "text-yes" : "text-no"}`} /></span>
                       <span className={`mono-num font-semibold ${estProfit >= 0 ? "text-yes" : "text-no"}`}>
