@@ -223,10 +223,10 @@ export function EditableName({ user }: EditableNameProps) {
     return (
       <button
         onClick={() => setEditing(true)}
-        className="group relative flex items-center gap-1.5"
+        className="group relative flex items-center gap-1.5 hover:text-primary transition-colors"
       >
         <h1 className="text-2xl font-bold truncate">{user.xName}</h1>
-        <Pencil className="h-3 w-3 text-base-content/40 opacity-0 group-hover:opacity-60 transition-opacity absolute -right-5" />
+        <Pencil className="h-3 w-3 text-base-content/30 group-hover:text-primary absolute -right-5" />
       </button>
     );
   }
@@ -319,11 +319,11 @@ export function EditableXHandle({ user }: EditableXHandleProps) {
       return (
         <button
           onClick={() => setEditing(true)}
-          className="group relative flex items-center gap-1.5 text-sm font-medium text-base-content/60 hover:text-base-content transition-colors"
+          className="group relative flex items-center gap-1.5 text-sm font-medium text-base-content/60 hover:text-primary transition-colors"
         >
           <XIcon size={14} />
           <span>@{user.xHandle}</span>
-          <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity absolute -right-5" />
+          <Pencil className="h-3 w-3 text-base-content/30 group-hover:text-primary absolute -right-5" />
         </button>
       );
     }

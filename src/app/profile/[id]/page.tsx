@@ -19,7 +19,7 @@ import { XIcon } from "@/components/ui/x-icon";
 import { OddsBar } from "@/components/market/odds-bar";
 import { EditableAvatar, EditableName, EditableXHandle } from "@/components/profile/profile-settings";
 import { FounderAvatar } from "@/components/founder/founder-avatar";
-import { Trophy, Target, Calendar, Layers, ArrowRight, TrendingUp, History } from "lucide-react";
+import { Trophy, Target, Calendar, Layers, ArrowRight, TrendingUp, History, Pencil } from "lucide-react";
 
 interface PageProps {
   params: Promise<{ id: string }>;
