@@ -42,18 +42,28 @@ export function StartupCard({ startup, activeMarketCount, sentiment }: StartupCa
 
         <div className="flex items-end gap-4">
           <div>
-            <div className="mono-num text-xl font-bold">{formatCents(startup.revenue.mrr)}</div>
+            <div className="mono-num text-xl font-bold">{startup.revenue.mrr ? formatCents(startup.revenue.mrr) : "-"}</div>
             <div className="text-[10px] font-medium uppercase tracking-wider text-base-content/50">MRR</div>
           </div>
+          <div>
+            <div className="mono-num text-sm font-bold">{startup.revenue.total ? formatCents(startup.revenue.total) : "-"}</div>
+            <div className="text-[10px] font-medium uppercase tracking-wider text-base-content/50">Total</div>
+          </div>
           <div className="flex items-center gap-1 pb-0.5">
-            {growthPositive ? (
-              <TrendingUp className="h-3.5 w-3.5 text-yes" />
+            {startup.growth30d ? (
+              <>
+                {growthPositive ? (
+                  <TrendingUp className="h-3.5 w-3.5 text-yes" />
+                ) : (
+                  <TrendingDown className="h-3.5 w-3.5 text-no" />
+                )}
+                <span className={`mono-num text-sm font-bold ${growthPositive ? "text-yes" : "text-no"}`}>
+                  {startup.growth30d.toFixed(1)}%
+                </span>
+              </>
             ) : (
-              <TrendingDown className="h-3.5 w-3.5 text-no" />
+              <span className="mono-num text-sm font-bold text-base-content/30">-</span>
             )}
-            <span className={`mono-num text-sm font-bold ${growthPositive ? "text-yes" : "text-no"}`}>
-              {startup.growth30d !== null ? `${startup.growth30d.toFixed(1)}%` : "N/A"}
-            </span>
           </div>
         </div>
 

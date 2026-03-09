@@ -45,17 +45,16 @@ export default async function StartupPage({ params }: PageProps) {
   const growthPositive = (startup.growth30d ?? 0) >= 0;
   const resolvedCorrectly = resolvedMarkets.filter((m) => m.resolvedOutcome === "yes").length;
 
-  const founderData = await Promise.all(
-    startup.cofounders.map(async (founder) => {
-      const allStartups = await getStartupsByFounder(founder.xHandle);
-      const founderMarkets: Awaited<ReturnType<typeof getMarketsForStartup>> = [];
-      for (const s of allStartups) {
-        const m = await getMarketsForStartup(s.slug);
-        founderMarkets.push(...m);
-      }
-      return { founder, allStartups, allMarkets: founderMarkets };
-    })
-  );
+  let founderData: { xHandle: string; allStartups: Awaited<ReturnType<typeof getStartupsByFounder>>; allMarkets: Awaited<ReturnType<typeof getMarketsForStartup>> } | null = null;
+  if (startup.xHandle) {
+    const allStartups = await getStartupsByFounder(startup.xHandle);
+    const founderMarkets: Awaited<ReturnType<typeof getMarketsForStartup>> = [];
+    for (const s of allStartups) {
+      const m = await getMarketsForStartup(s.slug);
+      founderMarkets.push(...m);
+    }
+    founderData = { xHandle: startup.xHandle, allStartups, allMarkets: founderMarkets };
+  }
 
   return (
     <div className="space-y-6 animate-fade-up">
@@ -189,15 +188,14 @@ export default async function StartupPage({ params }: PageProps) {
           )}
         </div>
 
-        {founderData.map((fd) => (
+        {founderData && (
           <FounderCard
-            key={fd.founder.xHandle}
-            founder={fd.founder}
+            xHandle={founderData.xHandle}
             xFollowerCount={startup.xFollowerCount}
-            allStartups={fd.allStartups}
-            allMarkets={fd.allMarkets}
+            allStartups={founderData.allStartups}
+            allMarkets={founderData.allMarkets}
           />
-        ))}
+        )}
       </div>
 
       {resolvedMarkets.length > 0 && (

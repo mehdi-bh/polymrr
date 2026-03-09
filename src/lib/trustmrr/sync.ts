@@ -41,7 +41,7 @@ function normalizeCategory(raw: string | null): string | null {
 
 /** Upsert a startup from TrustMRR list data (no detail call needed).
  *  Updates all revenue/metric fields. Skips detail-only fields (xFollowerCount,
- *  techStack, cofounders, isMerchantOfRecord) — those keep their existing values.
+ *  techStack, isMerchantOfRecord) — those keep their existing values.
  *  For new startups (not in DB), those fields will be null until a full sync runs. */
 export async function upsertStartupFromList(admin: Admin, data: TrustMRRListItem) {
   const { error } = await admin.from("startups").upsert(
@@ -128,24 +128,6 @@ export async function upsertStartup(admin: Admin, data: TrustMRRDetail) {
     }
   }
 
-  // Replace cofounders — ensure the primary founder (xHandle) is always included
-  await admin.from("startup_cofounders").delete().eq("startup_slug", data.slug);
-  const cofounders = data.cofounders ?? [];
-  const hasFounder = data.xHandle && cofounders.some((c) => c.xHandle === data.xHandle);
-  const allCofounders = hasFounder || !data.xHandle
-    ? cofounders
-    : [{ xHandle: data.xHandle, xName: null }, ...cofounders];
-
-  if (allCofounders.length > 0) {
-    const { error: cofErr } = await admin.from("startup_cofounders").insert(
-      allCofounders.map((c) => ({
-        startup_slug: data.slug,
-        x_handle: c.xHandle,
-        x_name: c.xName,
-      }))
-    );
-    if (cofErr) console.error(`Cofounders for ${data.slug}:`, cofErr.message);
-  }
 }
 
 /** Store a daily snapshot (upserts on startup_slug + snapshot_date) */

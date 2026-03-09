@@ -184,7 +184,6 @@ export interface TrustMRRDetail extends TrustMRRListItem {
   xFollowerCount: number | null;
   isMerchantOfRecord: boolean;
   techStack: { slug: string; category: string }[];
-  cofounders: { xHandle: string; xName: string | null }[];
 }
 
 export async function listStartups(params: {

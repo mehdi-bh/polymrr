@@ -42,16 +42,17 @@ export async function getCurrentUser(): Promise<User | null> {
 
 // -- Startups ---------------------------------------------------------------
 
-async function fetchStartupRelations(
+async function fetchTechMap(
   supabase: Awaited<ReturnType<typeof createClient>>,
   slugs: string[]
 ) {
-  if (slugs.length === 0) return { techMap: new Map(), cofounderMap: new Map() };
+  if (slugs.length === 0) return new Map<string, any[]>();
 
-  const [{ data: tech }, { data: cofounders }] = await Promise.all([
-    supabase.from("startup_tech_stack").select("*").in("startup_slug", slugs).limit(5000),
-    supabase.from("startup_cofounders").select("*").in("startup_slug", slugs).limit(5000),
-  ]);
+  const { data: tech } = await supabase
+    .from("startup_tech_stack")
+    .select("*")
+    .in("startup_slug", slugs)
+    .limit(5000);
 
   const techMap = new Map<string, typeof tech>();
   for (const t of tech ?? []) {
@@ -60,14 +61,7 @@ async function fetchStartupRelations(
     techMap.set(t.startup_slug, arr);
   }
 
-  const cofounderMap = new Map<string, typeof cofounders>();
-  for (const c of cofounders ?? []) {
-    const arr = cofounderMap.get(c.startup_slug) ?? [];
-    arr.push(c);
-    cofounderMap.set(c.startup_slug, arr);
-  }
-
-  return { techMap, cofounderMap };
+  return techMap;
 }
 
 export async function getStartups(): Promise<Startup[]> {
@@ -76,10 +70,10 @@ export async function getStartups(): Promise<Startup[]> {
   if (!rows || rows.length === 0) return [];
 
   const slugs = rows.map((r) => r.slug);
-  const { techMap, cofounderMap } = await fetchStartupRelations(supabase, slugs);
+  const techMap = await fetchTechMap(supabase, slugs);
 
   return rows.map((r) =>
-    mapStartup(r, techMap.get(r.slug) ?? [], cofounderMap.get(r.slug) ?? [])
+    mapStartup(r, techMap.get(r.slug) ?? [])
   );
 }
 
@@ -92,26 +86,18 @@ export async function getStartupBySlug(slug: string): Promise<Startup | undefine
     .single();
   if (!row) return undefined;
 
-  const { techMap, cofounderMap } = await fetchStartupRelations(supabase, [slug]);
-  return mapStartup(row, techMap.get(slug) ?? [], cofounderMap.get(slug) ?? []);
+  const techMap = await fetchTechMap(supabase, [slug]);
+  return mapStartup(row, techMap.get(slug) ?? []);
 }
 
 export async function getStartupsByFounder(xHandle: string): Promise<Startup[]> {
   const supabase = await createClient();
-  const { data: cofRows } = await supabase
-    .from("startup_cofounders")
-    .select("startup_slug")
-    .eq("x_handle", xHandle);
-  if (!cofRows || cofRows.length === 0) return [];
-
-  const slugs = cofRows.map((r) => r.startup_slug);
-  const { data: rows } = await supabase.from("startups").select("*").in("slug", slugs);
+  const { data: rows } = await supabase.from("startups").select("*").eq("x_handle", xHandle);
   if (!rows || rows.length === 0) return [];
 
-  const { techMap, cofounderMap } = await fetchStartupRelations(supabase, slugs);
-  return rows.map((r) =>
-    mapStartup(r, techMap.get(r.slug) ?? [], cofounderMap.get(r.slug) ?? [])
-  );
+  const slugs = rows.map((r) => r.slug);
+  const techMap = await fetchTechMap(supabase, slugs);
+  return rows.map((r) => mapStartup(r, techMap.get(r.slug) ?? []));
 }
 
 export async function getMrrHistory(slug: string): Promise<MrrSnapshot[]> {
@@ -200,23 +186,19 @@ export async function getStartupsPaginated(
 
   if (filters.search) {
     const term = `%${filters.search}%`;
-    // Search cofounders and tech stack in parallel for matching slugs
-    const [{ data: cofRows }, { data: techRows }] = await Promise.all([
-      supabase.from("startup_cofounders").select("startup_slug").or(`x_name.ilike.${term},x_handle.ilike.${term}`),
-      supabase.from("startup_tech_stack").select("startup_slug").ilike("slug", term),
-    ]);
-    const relatedSlugs = [...new Set([
-      ...(cofRows ?? []).map((r) => r.startup_slug),
-      ...(techRows ?? []).map((r) => r.startup_slug),
-    ])];
+    const { data: techRows } = await supabase
+      .from("startup_tech_stack")
+      .select("startup_slug")
+      .ilike("slug", term);
+    const techSlugs = (techRows ?? []).map((r) => r.startup_slug);
     const orParts = [
       `name.ilike.${term}`,
       `description.ilike.${term}`,
       `country.ilike.${term}`,
       `x_handle.ilike.${term}`,
     ];
-    if (relatedSlugs.length > 0) {
-      orParts.push(`slug.in.(${relatedSlugs.join(",")})`);
+    if (techSlugs.length > 0) {
+      orParts.push(`slug.in.(${techSlugs.join(",")})`);
     }
     query = query.or(orParts.join(","));
   }
@@ -250,10 +232,10 @@ export async function getStartupsPaginated(
   if (!rows || rows.length === 0) return { data: [], total: count ?? 0 };
 
   const slugs = rows.map((r) => r.slug);
-  const { techMap, cofounderMap } = await fetchStartupRelations(supabase, slugs);
+  const techMap = await fetchTechMap(supabase, slugs);
 
   const startups = rows.map((r) =>
-    mapStartup(r, techMap.get(r.slug) ?? [], cofounderMap.get(r.slug) ?? [])
+    mapStartup(r, techMap.get(r.slug) ?? [])
   );
 
   return { data: startups, total: count ?? 0 };
@@ -275,56 +257,56 @@ export async function getFoundersPaginated(
   const supabase = await createClient();
   const page = filters.page ?? 1;
   const perPage = filters.perPage ?? 12;
-  const ROW_LIMIT = 5000;
 
-  // Get all cofounder-to-startup mappings in a single query
-  let cofQuery = supabase
-    .from("startup_cofounders")
-    .select("startup_slug, x_handle, x_name")
-    .limit(ROW_LIMIT);
-  if (filters.search) {
-    const term = `%${filters.search}%`;
-    cofQuery = cofQuery.or(`x_name.ilike.${term},x_handle.ilike.${term}`);
+  // Fetch ALL startups with x_handle, paginating to avoid Supabase row limits
+  const PAGE_SIZE = 1000;
+  let startupRows: any[] = [];
+  let offset = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const { data } = await supabase
+      .from("startups")
+      .select("*")
+      .not("x_handle", "is", null)
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (!data || data.length === 0) break;
+    startupRows.push(...data);
+    hasMore = data.length === PAGE_SIZE;
+    offset += PAGE_SIZE;
   }
-  const { data: cofRows } = await cofQuery;
-  if (!cofRows || cofRows.length === 0) return { data: [], total: 0 };
+  if (startupRows.length === 0) return { data: [], total: 0 };
 
-  // Build founder → slugs map and deduplicate founders
-  const founderMap = new Map<string, { xName: string | null; slugs: string[] }>();
-  for (const r of cofRows) {
-    const existing = founderMap.get(r.x_handle);
+  const allSlugs = startupRows.map((r: any) => r.slug);
+  const techMap = await fetchTechMap(supabase, allSlugs);
+
+  // Build founder→startups map from x_handle
+  const founderMap = new Map<string, { startups: Startup[] }>();
+
+  for (const r of startupRows) {
+    const startup = mapStartup(r, techMap.get(r.slug) ?? []);
+    const handle = r.x_handle as string;
+    const existing = founderMap.get(handle);
     if (existing) {
-      if (!existing.slugs.includes(r.startup_slug)) existing.slugs.push(r.startup_slug);
+      existing.startups.push(startup);
     } else {
-      founderMap.set(r.x_handle, { xName: r.x_name, slugs: [r.startup_slug] });
+      founderMap.set(handle, { startups: [startup] });
     }
   }
 
-  // Fetch all startups in one query
-  const allSlugs = [...new Set(cofRows.map((r) => r.startup_slug))];
-  const { data: startupRows } = await supabase
-    .from("startups")
-    .select("*")
-    .in("slug", allSlugs)
-    .limit(ROW_LIMIT);
-  const { techMap, cofounderMap } = await fetchStartupRelations(supabase, allSlugs);
-
-  const startupMap = new Map<string, Startup>();
-  for (const r of startupRows ?? []) {
-    startupMap.set(r.slug, mapStartup(r, techMap.get(r.slug) ?? [], cofounderMap.get(r.slug) ?? []));
-  }
-
-  // Build founder data
-  let founders: FounderData[] = Array.from(founderMap.entries()).map(([xHandle, { xName, slugs }]) => {
-    const startups = slugs.map((s) => startupMap.get(s)).filter(Boolean) as Startup[];
-    return {
+  // Filter by search
+  let founders: FounderData[] = Array.from(founderMap.entries())
+    .filter(([xHandle]) => {
+      if (!filters.search) return true;
+      const term = filters.search.toLowerCase();
+      return xHandle.toLowerCase().includes(term);
+    })
+    .map(([xHandle, { startups }]) => ({
       xHandle,
-      xName,
+      xName: null,
       startups,
       totalRevenue: startups.reduce((sum, s) => sum + s.revenue.total, 0),
       totalFollowers: Math.max(0, ...startups.map((s) => s.xFollowerCount ?? 0)),
-    };
-  });
+    }));
 
   // Sort
   switch (filters.sort) {
@@ -443,11 +425,11 @@ export async function getMarketsPaginated(
   const startupMap = new Map<string, Startup>();
   if (startupRows) {
     const slugs = startupRows.map((r) => r.slug);
-    const { techMap, cofounderMap } = await fetchStartupRelations(supabase, slugs);
+    const techMap = await fetchTechMap(supabase, slugs);
     for (const r of startupRows) {
       startupMap.set(
         r.slug,
-        mapStartup(r, techMap.get(r.slug) ?? [], cofounderMap.get(r.slug) ?? [])
+        mapStartup(r, techMap.get(r.slug) ?? [])
       );
     }
   }

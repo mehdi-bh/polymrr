@@ -169,9 +169,9 @@ export default async function MarketPage({ params }: PageProps) {
                 Resolved {market.resolvedOutcome?.toUpperCase()}
               </span>
             )}
-            {!isFounderMarket && (startup.xHandle || startup.cofounders?.[0]?.xHandle) && (
+            {!isFounderMarket && startup.xHandle && (
               <a
-                href={`https://x.com/${startup.xHandle || startup.cofounders[0].xHandle}`}
+                href={`https://x.com/${startup.xHandle}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn btn-sm gap-1.5 border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50 ml-auto"

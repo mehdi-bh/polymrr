@@ -39,14 +39,14 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  // For founder markets, verify founder exists in startup_cofounders
+  // For founder markets, verify founder exists
   if (isFounderMetric(blueprint.metric) && blueprint.founderXHandle) {
-    const { data: cofRows } = await admin
-      .from("startup_cofounders")
-      .select("x_handle")
+    const { data: founderRows } = await admin
+      .from("startups")
+      .select("slug")
       .eq("x_handle", blueprint.founderXHandle)
       .limit(1);
-    if (!cofRows || cofRows.length === 0) {
+    if (!founderRows || founderRows.length === 0) {
       return NextResponse.json({ error: "Founder not found" }, { status: 404 });
     }
   }

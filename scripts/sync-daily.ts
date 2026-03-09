@@ -61,7 +61,7 @@ async function main() {
             newCount++;
           } else {
             await upsertStartupFromList(admin, item);
-            await storeSnapshot(admin, { ...item, xFollowerCount: null, isMerchantOfRecord: false, techStack: [], cofounders: [] });
+            await storeSnapshot(admin, { ...item, xFollowerCount: null, isMerchantOfRecord: false, techStack: [] });
           }
           synced++;
           if (logId) lines = await updateProgress(admin, logId, synced, total, `${synced}/${total} ${item.slug} OK`, lines);

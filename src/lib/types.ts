@@ -51,11 +51,6 @@ export interface TechStackItem {
   category: string;
 }
 
-export interface Cofounder {
-  xHandle: string;
-  xName: string | null;
-}
-
 /** Matches the TrustMRR GET /api/v1/startups/{slug} response shape */
 export interface Startup {
   name: string;
@@ -85,7 +80,6 @@ export interface Startup {
   xFollowerCount: number | null;
   isMerchantOfRecord: boolean;
   techStack: TechStackItem[];
-  cofounders: Cofounder[];
 }
 
 // -- PolyMRR domain models --------------------------------------------------

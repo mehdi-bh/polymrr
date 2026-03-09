@@ -27,10 +27,9 @@ export default async function CreateMarketPage({ searchParams }: PageProps) {
   if (params.founder) {
     const founderStartups = await getStartupsByFounder(params.founder);
     if (founderStartups.length > 0) {
-      const cofounder = founderStartups[0].cofounders.find((c) => c.xHandle === params.founder);
       initialFounder = {
         xHandle: params.founder,
-        xName: cofounder?.xName ?? null,
+        xName: null,
         startups: founderStartups,
       };
     }

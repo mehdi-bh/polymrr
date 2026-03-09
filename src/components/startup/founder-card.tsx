@@ -1,19 +1,18 @@
 import Link from "next/link";
 import { formatCents } from "@/lib/helpers";
-import type { Cofounder, Startup, Market } from "@/lib/types";
+import type { Startup, Market } from "@/lib/types";
 import { XIcon } from "@/components/ui/x-icon";
 import { FounderAvatar } from "@/components/founder/founder-avatar";
 import { ArrowRight } from "lucide-react";
 
 interface FounderCardProps {
-  founder: Cofounder;
+  xHandle: string;
   xFollowerCount: number | null;
   allStartups: Startup[];
   allMarkets: Market[];
 }
 
-export function FounderCard({ founder, xFollowerCount, allStartups, allMarkets }: FounderCardProps) {
-  const name = founder.xName ?? founder.xHandle;
+export function FounderCard({ xHandle, xFollowerCount, allStartups, allMarkets }: FounderCardProps) {
   const totalMrr = allStartups.reduce((sum, s) => sum + s.revenue.mrr, 0);
   const totalMarkets = allMarkets.filter((m) => m.status === "open").length;
   const avgGrowth = allStartups.length > 0
@@ -29,7 +28,7 @@ export function FounderCard({ founder, xFollowerCount, allStartups, allMarkets }
     <div className="card border border-primary/20 bg-base-100 overflow-hidden">
       <div className="flex items-center justify-end px-5 pt-4">
         <a
-          href={`https://x.com/${founder.xHandle}`}
+          href={`https://x.com/${xHandle}`}
           target="_blank"
           rel="noopener noreferrer"
           className="btn btn-ghost btn-xs btn-square opacity-50 hover:opacity-100"
@@ -40,13 +39,13 @@ export function FounderCard({ founder, xFollowerCount, allStartups, allMarkets }
 
       <div className="card-body items-center gap-4 px-5 pb-5 pt-3">
         <FounderAvatar
-          xHandle={founder.xHandle}
-          name={name}
+          xHandle={xHandle}
+          name={xHandle}
           size={80}
         />
 
         <div className="text-center">
-          <div className="text-sm font-bold uppercase tracking-wide">@{founder.xHandle}</div>
+          <div className="text-sm font-bold uppercase tracking-wide">@{xHandle}</div>
           <div className="mono-num text-xs text-base-content/50">
             {allStartups.length} startup{allStartups.length !== 1 ? "s" : ""} tracked
           </div>
@@ -107,7 +106,7 @@ export function FounderCard({ founder, xFollowerCount, allStartups, allMarkets }
         <div className="h-px w-full bg-base-300" />
 
         <Link
-          href={`/markets/create?founder=${founder.xHandle}`}
+          href={`/markets/create?founder=${xHandle}`}
           className="btn btn-primary btn-sm w-full gap-1.5"
         >
           Bet on this founder ({totalMarkets})

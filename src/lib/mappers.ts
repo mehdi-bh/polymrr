@@ -8,13 +8,12 @@ import type {
   MrrSnapshot,
   PnlSnapshot,
   TechStackItem,
-  Cofounder,
   TrustMRRCategory,
   PaymentProvider,
 } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mapStartup(row: any, techStack: any[], cofounders: any[]): Startup {
+export function mapStartup(row: any, techStack: any[] = []): Startup {
   return {
     name: row.name,
     slug: row.slug,
@@ -44,9 +43,6 @@ export function mapStartup(row: any, techStack: any[], cofounders: any[]): Start
     isMerchantOfRecord: row.is_merchant_of_record,
     techStack: techStack.map(
       (t): TechStackItem => ({ slug: t.slug, category: t.category })
-    ),
-    cofounders: cofounders.map(
-      (c): Cofounder => ({ xHandle: c.x_handle, xName: c.x_name })
     ),
   };
 }

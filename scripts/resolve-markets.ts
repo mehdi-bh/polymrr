@@ -121,15 +121,11 @@ async function main() {
       // For founder markets, fetch all startups for this founder
       let founderStartups: any[] | undefined;
       if (market.type === "founder" && market.founder_x_handle) {
-        const { data: cofRows } = await admin
-          .from("startup_cofounders")
-          .select("startup_slug")
+        const { data: rows } = await admin
+          .from("startups")
+          .select("*")
           .eq("x_handle", market.founder_x_handle);
-        if (cofRows && cofRows.length > 0) {
-          const slugs = cofRows.map((r: any) => r.startup_slug);
-          const { data: rows } = await admin.from("startups").select("*").in("slug", slugs);
-          founderStartups = rows ?? [];
-        }
+        founderStartups = rows ?? [];
       }
 
       const outcome = determineOutcome(market, founderStartups);
