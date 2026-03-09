@@ -51,8 +51,23 @@ function Initials({ name }: { name: string }) {
   );
 }
 
+const MARKET_MAKER_ID = "c0000000-0000-0000-0000-000000000001";
+
 function UserAvatar({ entry }: { entry: LeaderboardEntry }) {
   const [imgError, setImgError] = useState(false);
+
+  if (entry.userId === MARKET_MAKER_ID) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src="/icon.svg"
+        alt="Market Maker"
+        width={40}
+        height={40}
+        className="h-10 w-10 rounded-full ring-2 ring-primary/30 object-cover"
+      />
+    );
+  }
 
   if (!entry.avatarUrl || imgError) {
     return <Initials name={entry.xName} />;
