@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
       name: s.name,
       icon: s.icon,
       mrr: s.revenue.mrr,
+      totalRevenue: s.revenue.total,
     })),
     total,
   });

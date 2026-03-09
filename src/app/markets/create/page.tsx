@@ -22,12 +22,6 @@ export default async function CreateMarketPage({ searchParams }: PageProps) {
   const initialStartup = params.startup
     ? await getStartupBySlug(params.startup)
     : undefined;
-  const initialStartupSlug = initialStartup?.slug;
-
-  // Ensure the initial startup is in the list (getStartups may miss it due to row limits)
-  if (initialStartup && !startups.some((s) => s.slug === initialStartup.slug)) {
-    startups.push(initialStartup);
-  }
 
   // Founder mode: prefill founder data
   let initialFounder: { xHandle: string; xName: string | null; startups: typeof startups } | undefined;
@@ -45,10 +39,10 @@ export default async function CreateMarketPage({ searchParams }: PageProps) {
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <CreateMarketForm
-        key={initialFounder?.xHandle ?? initialStartupSlug ?? "picker"}
+        key={initialFounder?.xHandle ?? initialStartup?.slug ?? "picker"}
         startups={startups}
         user={user}
-        initialStartupSlug={initialStartupSlug}
+        initialStartup={initialStartup}
         initialFounder={initialFounder}
         openMarkets={openMarkets}
       />

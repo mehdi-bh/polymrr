@@ -33,6 +33,7 @@ interface PickerStartup {
   name: string;
   icon: string | null;
   mrr: number;
+  totalRevenue: number;
 }
 
 interface PickerFounder {
@@ -62,7 +63,7 @@ import { FounderAvatar } from "@/components/founder/founder-avatar";
 interface CreateMarketFormProps {
   startups: Startup[];
   user: User;
-  initialStartupSlug?: string;
+  initialStartup?: Startup;
   initialFounder?: {
     xHandle: string;
     xName: string | null;
@@ -86,7 +87,7 @@ function isoDate(daysFromNow: number): string {
 export function CreateMarketForm({
   startups,
   user,
-  initialStartupSlug,
+  initialStartup,
   initialFounder,
   openMarkets,
 }: CreateMarketFormProps) {
@@ -98,7 +99,7 @@ export function CreateMarketForm({
   const isFounderMode = !!initialFounder;
 
   // Form state
-  const [startupSlug, setStartupSlug] = useState(initialStartupSlug ?? "");
+  const [startupSlug, setStartupSlug] = useState(initialStartup?.slug ?? "");
   const [search, setSearch] = useState("");
   const [pickerTab, setPickerTab] = useState<"startups" | "founders">("startups");
   const [pickerPage, setPickerPage] = useState(1);
@@ -112,11 +113,31 @@ export function CreateMarketForm({
   const [topStartupSlug, setTopStartupSlug] = useState("");
   // For founder picker in step 1
   const [selectedFounderHandle, setSelectedFounderHandle] = useState("");
+  // Fetched startup data (for startups picked from step 1)
+  const [fetchedStartup, setFetchedStartup] = useState<Startup | null>(null);
 
   // In founder mode, skip step 1 (startup picker) — go straight to metric
-  const [step, setStep] = useState(initialStartupSlug || isFounderMode ? 2 : 1);
+  const [step, setStep] = useState(initialStartup || isFounderMode ? 2 : 1);
 
-  const selectedStartup = startups.find((s) => s.slug === startupSlug);
+  // Fetch full startup data when selected from picker
+  useEffect(() => {
+    if (!startupSlug || startupSlug === initialStartup?.slug) {
+      setFetchedStartup(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/startup/${encodeURIComponent(startupSlug)}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (!cancelled && data) setFetchedStartup(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [startupSlug, initialStartup?.slug]);
+
+  const selectedStartup = initialStartup?.slug === startupSlug
+    ? initialStartup
+    : fetchedStartup?.slug === startupSlug
+    ? fetchedStartup
+    : startups.find((s) => s.slug === startupSlug);
   const selectedMetric = metric ? METRICS[metric] : null;
 
   // Metric list depends on mode
@@ -532,7 +553,7 @@ export function CreateMarketForm({
                       <div className="flex-1 text-left">
                         <div className="font-semibold">{s.name}</div>
                         <div className="text-xs text-base-content/50">
-                          {formatCents(s.mrr)} MRR
+                          {formatCents(s.mrr)} MRR · {formatCents(s.totalRevenue)} total
                         </div>
                       </div>
                       {mc > 0 && (
@@ -905,7 +926,7 @@ export function CreateMarketForm({
           {step > 1 && (
             <button
               onClick={() => {
-                if ((isFounderMode || initialStartupSlug) && step === 2) {
+                if ((isFounderMode || initialStartup) && step === 2) {
                   router.push("/markets/create");
                   return;
                 }
