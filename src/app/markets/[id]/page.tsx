@@ -425,6 +425,9 @@ export default async function MarketPage({ params }: PageProps) {
                         return (
                           <div key={bet.id} className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
+                              {bet.userId === MARKET_MAKER_ID && (
+                                <Image src="/icon.png" alt="" width={16} height={16} className="rounded-sm" />
+                              )}
                               <Link
                                 href={`/profile/${bet.userId}`}
                                 className="text-[13px] font-semibold text-primary hover:underline"
