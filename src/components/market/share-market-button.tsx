@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Share2, Download, X, Copy, Check } from "lucide-react";
 
 interface ShareMarketButtonProps {
@@ -229,7 +230,7 @@ export function ShareMarketButton({
         {size === "md" && <span>Share</span>}
       </button>
 
-      {open && (
+      {open && createPortal(
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] bg-base-200/90 backdrop-blur-md" onClick={handleClose}>
           <div
             className="card w-full max-w-xl bg-base-100 border border-base-300 shadow-2xl mx-4 animate-fade-up"
@@ -269,7 +270,8 @@ export function ShareMarketButton({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
