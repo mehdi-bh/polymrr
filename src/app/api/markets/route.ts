@@ -11,6 +11,7 @@ import {
   METRICS,
   type MarketBlueprint,
 } from "@/lib/market-templates";
+import { validateMarketAgainstData, wouldResolveImmediately, type StartupData, type FounderData } from "@/lib/market-validation";
 import { tryCompleteQuest } from "@/lib/quest-engine";
 
 export async function POST(request: Request) {
@@ -39,27 +40,43 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  // For founder markets, verify founder exists
-  if (isFounderMetric(blueprint.metric) && blueprint.founderXHandle) {
-    const { data: founderRows } = await admin
-      .from("startups")
-      .select("slug")
-      .eq("x_handle", blueprint.founderXHandle)
-      .limit(1);
-    if (!founderRows || founderRows.length === 0) {
-      return NextResponse.json({ error: "Founder not found" }, { status: 404 });
-    }
-  }
-
-  // Verify startup exists
+  // Verify startup exists and fetch full data for validation
   const { data: startup } = await admin
     .from("startups")
-    .select("slug, name")
+    .select("*")
     .eq("slug", blueprint.startupSlug)
     .single();
 
   if (!startup) {
     return NextResponse.json({ error: "Startup not found" }, { status: 404 });
+  }
+
+  // Build founder data if needed for validation
+  let founderData: FounderData | undefined;
+  if (isFounderMetric(blueprint.metric) && blueprint.founderXHandle) {
+    const { data: founderStartups } = await admin
+      .from("startups")
+      .select("*")
+      .eq("x_handle", blueprint.founderXHandle);
+    if (founderStartups && founderStartups.length > 0) {
+      founderData = {
+        x_handle: blueprint.founderXHandle,
+        startups: founderStartups as StartupData[],
+        totalRevenue: founderStartups.reduce((sum: number, s: StartupData) => sum + (Number(s.revenue_total) || 0), 0),
+        startupCount: founderStartups.length,
+        maxFollowers: Math.max(...founderStartups.map((s: StartupData) => Number(s.x_follower_count) || 0)),
+      };
+    }
+  }
+
+  // Validate market makes sense against current data
+  const dataError = validateMarketAgainstData(blueprint, startup as StartupData, founderData);
+  if (dataError) {
+    return NextResponse.json({ error: dataError }, { status: 400 });
+  }
+
+  if (wouldResolveImmediately(blueprint, startup as StartupData, founderData)) {
+    return NextResponse.json({ error: "This market would resolve immediately — the condition is already met" }, { status: 400 });
   }
 
   // Check user has enough credits
