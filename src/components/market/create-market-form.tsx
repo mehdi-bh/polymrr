@@ -905,7 +905,7 @@ export function CreateMarketForm({
           {step > 1 && (
             <button
               onClick={() => {
-                if (isFounderMode && step === 2) {
+                if ((isFounderMode || initialStartupSlug) && step === 2) {
                   router.push("/markets/create");
                   return;
                 }

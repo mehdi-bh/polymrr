@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser, getStartups, getStartupsByFounder, getOpenMarkets } from "@/lib/data";
+import { getCurrentUser, getStartups, getStartupBySlug, getStartupsByFounder, getOpenMarkets } from "@/lib/data";
 import { CreateMarketForm } from "@/components/market/create-market-form";
 
 interface PageProps {
@@ -18,9 +18,16 @@ export default async function CreateMarketPage({ searchParams }: PageProps) {
     redirect("/");
   }
 
-  const initialStartupSlug = startups.some((s) => s.slug === params.startup)
-    ? params.startup
+  // Validate startup slug directly from DB
+  const initialStartup = params.startup
+    ? await getStartupBySlug(params.startup)
     : undefined;
+  const initialStartupSlug = initialStartup?.slug;
+
+  // Ensure the initial startup is in the list (getStartups may miss it due to row limits)
+  if (initialStartup && !startups.some((s) => s.slug === initialStartup.slug)) {
+    startups.push(initialStartup);
+  }
 
   // Founder mode: prefill founder data
   let initialFounder: { xHandle: string; xName: string | null; startups: typeof startups } | undefined;
