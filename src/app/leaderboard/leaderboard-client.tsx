@@ -43,23 +43,30 @@ function RankBadge({ rank }: { rank: number }) {
   );
 }
 
-function UserAvatar({ entry }: { entry: LeaderboardEntry }) {
-  if (entry.avatarUrl) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={entry.avatarUrl}
-        alt={entry.xName}
-        width={40}
-        height={40}
-        className="h-10 w-10 rounded-full ring-2 ring-base-300 object-cover"
-      />
-    );
-  }
+function Initials({ name }: { name: string }) {
   return (
     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary ring-2 ring-primary/20">
-      {entry.xName.slice(0, 2).toUpperCase()}
+      {name.slice(0, 2).toUpperCase()}
     </div>
+  );
+}
+
+function UserAvatar({ entry }: { entry: LeaderboardEntry }) {
+  const [imgError, setImgError] = useState(false);
+
+  if (!entry.avatarUrl || imgError) {
+    return <Initials name={entry.xName} />;
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={entry.avatarUrl}
+      alt={entry.xName}
+      width={40}
+      height={40}
+      className="h-10 w-10 rounded-full ring-2 ring-base-300 object-cover"
+      onError={() => setImgError(true)}
+    />
   );
 }
 
