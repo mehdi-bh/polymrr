@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { QuestPopup } from "@/components/ui/quest-popup";
 import { SignInButton } from "@/components/ui/sign-in-button";
 import type { User } from "@/lib/types";
-import Image from "next/image";
+import { Logo } from "@/components/ui/logo";
 import { TrendingUp, BarChart3, Trophy, LayoutDashboard, User as UserIcon, LogOut, Flame } from "lucide-react";
 
 const navLinks = [
@@ -35,11 +35,8 @@ export function Navbar({ user, completedQuests }: NavbarProps) {
       <div className="navbar sticky top-0 z-50 border-b border-base-300 bg-base-200/90 backdrop-blur-lg px-4">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between">
           <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2">
-              <Image src="/icon.png" alt="PolyMRR" width={28} height={28} className="rounded-md" />
-              <span className="text-lg font-bold tracking-tight">
-                Poly<span className="text-primary">MRR</span>
-              </span>
+            <Link href="/">
+              <Logo />
             </Link>
             <div className="hidden gap-1 md:flex">
               {navLinks.map((link) => (

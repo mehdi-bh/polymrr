@@ -120,7 +120,9 @@ export function mapFeedItem(row: any): FeedItem {
   return {
     id: row.id,
     marketId: row.market_id,
-    userXHandle: row.user_x_handle,
+    userId: row.user_id,
+    userXHandle: row.user_x_handle ?? null,
+    userName: row.user_name ?? null,
     side: row.side,
     startupName: row.startup_name,
     marketQuestion: row.market_question,

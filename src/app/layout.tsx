@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { Inconsolata } from "next/font/google";
+import { Inconsolata, JetBrains_Mono } from "next/font/google";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { ToastProvider } from "@/components/ui/toast";
@@ -8,6 +8,7 @@ import { getCurrentUser, getUserQuestCompletions } from "@/lib/data";
 import "./globals.css";
 
 const inconsolata = Inconsolata({ variable: "--font-inconsolata", subsets: ["latin"] });
+const jetbrainsMono = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"], weight: ["400", "700", "800"] });
 
 export const metadata: Metadata = {
   title: {
@@ -82,7 +83,7 @@ export default async function RootLayout({
           data-domain="polymrr.com"
           strategy="afterInteractive"
         />
-      <body className={`${inconsolata.variable} font-sans antialiased flex min-h-dvh flex-col`}>
+      <body className={`${inconsolata.variable} ${jetbrainsMono.variable} font-sans antialiased flex min-h-dvh flex-col`}>
         <ToastProvider>
           <Navbar user={user} completedQuests={completedQuests} />
           <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 pb-20 md:pb-8">{children}</main>

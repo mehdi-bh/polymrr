@@ -166,7 +166,9 @@ export interface PnlSnapshot {
 export interface FeedItem {
   id: string;
   marketId: string;
-  userXHandle: string;
+  userId: string;
+  userXHandle: string | null;
+  userName: string | null;
   side: "yes" | "no";
   startupName: string;
   marketQuestion: string;

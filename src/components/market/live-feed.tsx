@@ -33,7 +33,11 @@ export function LiveFeed({ items }: LiveFeedProps) {
               {item.side.toUpperCase()}
             </span>
             <div className="min-w-0 flex-1 truncate text-xs text-base-content/50">
-              <span className="hidden font-semibold text-primary sm:inline">@{item.userXHandle} </span>
+              {(item.userXHandle || item.userName) && (
+                <span className="hidden font-semibold text-primary sm:inline">
+                  {item.userXHandle ? `@${item.userXHandle}` : item.userName}{" "}
+                </span>
+              )}
               {item.startupName} &middot; &quot;{item.marketQuestion}&quot;
             </div>
             <div className="flex shrink-0 items-center gap-2 text-xs text-base-content/40">
