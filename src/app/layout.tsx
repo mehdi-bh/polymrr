@@ -77,7 +77,7 @@ export default async function RootLayout({
         />
       </head>
       <Script
-          src="https://datafa.st/js/script.js"
+          src="/js/script.js"
           data-website-id="dfid_TK8zUELoEtzSMWKG34YHi"
           data-domain="polymrr.com"
           strategy="afterInteractive"
