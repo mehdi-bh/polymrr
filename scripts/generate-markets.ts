@@ -17,6 +17,9 @@ import {
 
 const MAX_MARKETS = 30;
 const MRR_MILESTONES = [100_000, 500_000, 1_000_000, 2_500_000, 5_000_000, 10_000_000];
+const MARKET_MAKER_ID = "c0000000-0000-0000-0000-000000000001";
+const SEED_BET_MIN = 100;
+const SEED_BET_MAX = 1500;
 
 function daysFromNow(days: number): string {
   const d = new Date();
@@ -101,7 +104,7 @@ async function main() {
 
       if (await findDuplicate(admin, bp)) { skipped++; continue; }
 
-      const { error } = await admin.from("markets").insert({
+      const { data: market, error } = await admin.from("markets").insert({
         startup_slug: bp.startupSlug,
         type: metric.marketType,
         question: generateQuestion(bp, s.name),
@@ -116,9 +119,24 @@ async function main() {
         total_bettors: 0,
         closes_at: bp.closesAt,
         created_by: null,
-      });
+      }).select("id").single();
 
-      if (!error) {
+      if (!error && market) {
+        // Place seed bet as Market Maker to bootstrap the pool
+        // Linear bias toward lower amounts: use min of two uniform rolls
+        const r1 = Math.random();
+        const r2 = Math.random();
+        const seedAmount = SEED_BET_MIN + Math.floor(Math.min(r1, r2) * (SEED_BET_MAX - SEED_BET_MIN + 1));
+        const { error: betError } = await admin.rpc("place_bet", {
+          p_market_id: market.id,
+          p_user_id: MARKET_MAKER_ID,
+          p_side: bp.seedSide,
+          p_amount: seedAmount,
+        });
+        if (betError) {
+          console.warn(`[generate-markets] Seed bet failed for ${s.name}: ${betError.message}`);
+        }
+
         generated++;
         const line = `${generated}/${MAX_MARKETS} ${s.name} — ${metric.label}`;
         if (logId) lines = await updateProgress(admin, logId, generated, MAX_MARKETS, line, lines);
