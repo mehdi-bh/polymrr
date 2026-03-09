@@ -21,6 +21,7 @@ on:
           - sync-startups
           - generate-markets
           - resolve-markets
+          - sync-followers
 
 env:
   NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -104,3 +105,16 @@ jobs:
         with: { node-version: 20, cache: npm }
       - run: npm ci
       - run: npx tsx scripts/sync-startups.ts
+
+  sync-followers:
+    if: github.event_name == 'workflow_dispatch' && inputs.job == 'sync-followers'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npx tsx scripts/sync-followers.ts

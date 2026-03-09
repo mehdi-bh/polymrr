@@ -181,7 +181,7 @@ export interface TrustMRRListItem {
 }
 
 export interface TrustMRRDetail extends TrustMRRListItem {
-  xFollowerCount: number | null;
+
   isMerchantOfRecord: boolean;
   techStack: { slug: string; category: string }[];
 }

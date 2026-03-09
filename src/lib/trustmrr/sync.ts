@@ -103,7 +103,7 @@ export async function upsertStartup(admin: Admin, data: TrustMRRDetail) {
       on_sale: data.onSale,
       first_listed_for_sale_at: data.firstListedForSaleAt,
       x_handle: data.xHandle,
-      x_follower_count: int(data.xFollowerCount),
+
       is_merchant_of_record: data.isMerchantOfRecord ?? false,
       synced_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
