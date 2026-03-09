@@ -27,6 +27,10 @@ const MARKET_MAKER_ID = "c0000000-0000-0000-0000-000000000001";
 const SEED_BET_MIN = 100;
 const SEED_BET_MAX = 1500;
 
+function isAnonymousStartup(s: StartupData): boolean {
+  return /^anonymous\s/i.test(s.name);
+}
+
 function daysFromNow(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
@@ -270,8 +274,10 @@ async function main() {
   // Collect all blueprints with their context
   const candidates: { bp: MarketBlueprint; startup: StartupData; founder?: FounderData }[] = [];
 
-  // Startup markets (weighted shuffle for variety)
-  const shuffledStartups = weightedShuffle(startups);
+  // Startup markets (weighted shuffle for variety, skip anonymous)
+  const shuffledStartups = weightedShuffle(
+    startups.filter((s: StartupData) => !isAnonymousStartup(s))
+  );
   for (const s of shuffledStartups) {
     const bps = generateStartupBlueprints(s as StartupData);
     const founderData = s.x_handle ? founderMap.get(s.x_handle) : undefined;

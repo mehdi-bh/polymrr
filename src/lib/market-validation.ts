@@ -37,6 +37,11 @@ export function validateMarketAgainstData(
   const metric = METRICS[blueprint.metric];
   if (!metric) return `Unknown metric: ${blueprint.metric}`;
 
+  // Skip anonymous startups
+  if (/^anonymous\s/i.test(startup.name)) {
+    return "Cannot create markets for anonymous startups";
+  }
+
   // --- Startup metric checks ---
 
   if (blueprint.metric === "mrr") {
