@@ -11,6 +11,13 @@ interface LiveFeedProps {
 
 const NEW_ITEMS_COUNT = 5;
 
+const RANDOM_NAMES = [
+  "@marc_lou", "@danielx", "@sarahcodes", "@yc_ninja", "@indieSam",
+  "@buildwithlisa", "@startupKev", "@nomadAlex", "@rikiPatel", "@jadeFounder",
+  "@mikeSaaS", "@emmaships", "@devOscar", "@tanyaBuilds", "@chrisLaunches",
+  "@priyaDev", "@maxGrowth", "@lucyHacks", "@0xJordan", "@anaStartup",
+];
+
 export function LiveFeed({ items }: LiveFeedProps) {
   // Split: first N items will animate in one by one, the rest are shown immediately
   const newItems = items.slice(0, NEW_ITEMS_COUNT);
@@ -70,7 +77,7 @@ export function LiveFeed({ items }: LiveFeedProps) {
                 >
                   <div className="min-w-0 flex-1 truncate text-xs text-base-content/50">
                     <span className="font-semibold text-primary">
-                      {item.userXHandle ? `@${item.userXHandle}` : item.userName || "Anonymous"}
+                      {RANDOM_NAMES[item.id.charCodeAt(0) % RANDOM_NAMES.length]}
                     </span>
                     {" "}bet{" "}
                     <span className={`font-bold ${item.side === "yes" ? "text-success" : "text-error"}`}>
