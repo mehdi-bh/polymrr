@@ -11,12 +11,16 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const market = await getMarketById(id);
   if (!market) return new Response("Not found", { status: 404 });
 
+  const isFounderMarket = market.type === "founder" && market.founderXHandle;
   const startup = await getStartupBySlug(market.startupSlug);
-  const startupIconUri = startup?.icon ? await loadExternalImage(startup.icon) : null;
+
+  const iconUri = isFounderMarket
+    ? await loadExternalImage(`https://unavatar.io/x/${market.founderXHandle}`)
+    : startup?.icon ? await loadExternalImage(startup.icon) : null;
 
   const yesOdds = Math.round(market.yesOdds);
   const noOdds = 100 - yesOdds;
-  const label = market.type === "founder" && market.founderXHandle
+  const label = isFounderMarket
     ? `@${market.founderXHandle}`
     : startup?.name ?? "Market";
 
@@ -37,12 +41,12 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <OgLogo />
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            {startupIconUri && (
+            {iconUri && (
               <img
-                src={startupIconUri}
+                src={iconUri}
                 width={28}
                 height={28}
-                style={{ borderRadius: 6 }}
+                style={{ borderRadius: isFounderMarket ? 14 : 6 }}
               />
             )}
             <span style={{ fontSize: 22, color: OG.muted, fontWeight: 500 }}>{label}</span>
