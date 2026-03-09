@@ -357,7 +357,7 @@ export default async function MarketPage({ params }: PageProps) {
       ) : (
         <>
           <a
-            href={`https://trustmrr.com/startups/${startup.slug}`}
+            href={`https://trustmrr.com/startup/${startup.slug}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-[13px] font-medium text-primary/80 transition-colors hover:bg-primary/10 hover:text-primary hover:border-primary/50"
