@@ -112,6 +112,7 @@ export function mapLeaderboardEntry(row: any): LeaderboardEntry {
     creditsWon: row.credits_won,
     creditsLost: row.credits_lost,
     currentStreak: row.current_streak,
+    profit: row.profit ?? (row.credits_won ?? 0) - (row.credits_lost ?? 0),
   };
 }
 

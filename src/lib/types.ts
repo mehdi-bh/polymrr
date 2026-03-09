@@ -148,6 +148,7 @@ export interface LeaderboardEntry {
   creditsWon: number;
   creditsLost: number;
   currentStreak: number;
+  profit: number;
 }
 
 /** A single point in the MRR history chart */

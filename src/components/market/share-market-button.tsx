@@ -58,10 +58,35 @@ async function generateShareImage(
   ctx.lineWidth = 2;
   ctx.strokeRect(1, 1, w - 2, h - 2);
 
-  // Branding
-  ctx.fillStyle = "#f5a623";
+  // Branding: chart icon + text
+  const iconX = 60;
+  const iconY = 44;
+  const iconSize = 28;
+  ctx.strokeStyle = "#f5a623";
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  // L-axis
+  ctx.beginPath();
+  ctx.moveTo(iconX + 3, iconY + 3);
+  ctx.lineTo(iconX + 3, iconY + iconSize - 3);
+  ctx.lineTo(iconX + iconSize - 3, iconY + iconSize - 3);
+  ctx.stroke();
+  // Chart line
+  ctx.beginPath();
+  ctx.moveTo(iconX + 7, iconY + iconSize * 0.55);
+  ctx.lineTo(iconX + iconSize * 0.42, iconY + iconSize * 0.38);
+  ctx.lineTo(iconX + iconSize * 0.62, iconY + iconSize * 0.55);
+  ctx.lineTo(iconX + iconSize * 0.85, iconY + iconSize * 0.22);
+  ctx.stroke();
+  // Text
+  const textX = iconX + iconSize + 10;
+  ctx.fillStyle = "#e5e5e5";
   ctx.font = "bold 28px system-ui, sans-serif";
-  ctx.fillText("PolyMRR", 60, 70);
+  ctx.fillText("Poly", textX, 70);
+  const polyW = ctx.measureText("Poly").width;
+  ctx.fillStyle = "#f5a623";
+  ctx.fillText("MRR", textX + polyW, 70);
 
   // Startup icon + name
   const nameY = 120;

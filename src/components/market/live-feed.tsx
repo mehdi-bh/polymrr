@@ -27,7 +27,7 @@ export function LiveFeed({ items }: LiveFeedProps) {
             href={`/markets/${item.marketId}`}
             className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-base-300/30 sm:px-5"
           >
-            <span className={`mono-num badge badge-sm shrink-0 ${
+            <span className={`mono-num badge badge-sm w-11 shrink-0 ${
               item.side === "yes" ? "badge-success badge-outline" : "badge-error badge-outline"
             }`}>
               {item.side.toUpperCase()}

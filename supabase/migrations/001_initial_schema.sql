@@ -162,7 +162,8 @@ limit 20;
 create or replace view leaderboard as
 select
   user_id, x_handle, x_name, avatar_url,
-  total_predictions, win_rate, credits_won, credits_lost, current_streak
+  total_predictions, win_rate, credits_won, credits_lost, current_streak,
+  credits_won - credits_lost as profit
 from (
   select
     p.id as user_id,
@@ -180,7 +181,6 @@ from (
   from profiles p
   left join bets b on b.user_id = p.id
   left join markets m on m.id = b.market_id
-  where p.x_handle is not null
   group by p.id, p.x_handle, p.x_name, p.avatar_url
 ) lb
 order by credits_won - credits_lost desc;
