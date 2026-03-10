@@ -61,7 +61,7 @@ export default async function ProfilePage({ params }: PageProps) {
   const resolvedBets = userBets.filter((b) => marketCache.get(b.marketId)?.status === "resolved");
   const isFounder = founderStartups.length > 0;
 
-  const profit = lbEntry ? lbEntry.creditsWon - lbEntry.creditsLost : 0;
+  const profit = lbEntry?.profit ?? 0;
 
   return (
     <div className="space-y-6 animate-fade-up">

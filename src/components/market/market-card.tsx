@@ -8,7 +8,9 @@ import { ShareMarketButton } from "./share-market-button";
 import { FounderAvatar } from "@/components/founder/founder-avatar";
 import { XIcon } from "@/components/ui/x-icon";
 import type { Market, Startup } from "@/lib/types";
+import Image from "next/image";
 import { Clock, Users } from "lucide-react";
+import { timeAgo } from "@/lib/helpers";
 
 interface MarketCardProps {
   market: Market;
@@ -20,10 +22,13 @@ export function MarketCard({ market, startup }: MarketCardProps) {
   const closingSoon = days <= 10;
   const isFounderMarket = market.type === "founder" && market.founderXHandle;
 
+  const isResolved = market.status === "resolved";
+  const outcomeYes = market.resolvedOutcome === "yes";
+
   return (
     <Link
       href={`/markets/${market.id}`}
-      className="card-hover card bg-base-100 border border-base-300"
+      className={`card-hover card bg-base-100 border ${isResolved ? (outcomeYes ? "border-yes/25" : "border-no/25") : "border-base-300"}`}
     >
       <div className="card-body gap-3 p-5">
         <div className="flex items-center justify-between gap-2">
@@ -57,11 +62,20 @@ export function MarketCard({ market, startup }: MarketCardProps) {
             )}
           </div>
           <div className="flex shrink-0 gap-1.5">
-            {startup.onSale && (
-              <span className="badge badge-warning badge-sm badge-outline">FOR SALE</span>
-            )}
-            {closingSoon && (
-              <span className="badge badge-error badge-sm badge-outline">CLOSING SOON</span>
+            {isResolved ? (
+              <span className={`badge badge-sm gap-1 ${outcomeYes ? "bg-yes/15 text-yes border-yes/30" : "bg-no/15 text-no border-no/30"}`}>
+                <Image src="/banana.svg" alt="" width={12} height={12} />
+                {outcomeYes ? "YES" : "NO"}
+              </span>
+            ) : (
+              <>
+                {startup.onSale && (
+                  <span className="badge badge-warning badge-sm badge-outline">FOR SALE</span>
+                )}
+                {closingSoon && (
+                  <span className="badge badge-error badge-sm badge-outline">CLOSING SOON</span>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -81,7 +95,11 @@ export function MarketCard({ market, startup }: MarketCardProps) {
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              <span className="mono-num">{days}d</span>
+              {isResolved ? (
+                <span className="mono-num">Resolved {timeAgo(market.resolvedAt ?? market.closesAt)}</span>
+              ) : (
+                <span className="mono-num">{days}d</span>
+              )}
             </span>
             <ShareMarketButton
               question={market.question}

@@ -11,6 +11,7 @@ import {
   getStartupBySlug,
   getStartupsByFounder,
   getBetsForMarket,
+  getPayoutsForMarket,
   getUserById,
   getCurrentUser,
   formatCents,
@@ -21,8 +22,11 @@ import { Credits } from "@/components/ui/credits";
 
 const MARKET_MAKER_ID = "c0000000-0000-0000-0000-000000000001";
 import { ShareMarketButton } from "@/components/market/share-market-button";
+import { ResolveButton } from "@/components/market/resolve-button";
 import { XIcon } from "@/components/ui/x-icon";
 import { Clock, Users, ExternalLink, MessageCircle, Activity } from "lucide-react";
+
+const MODERATORS = ["mehdibhaddou"];
 import { METRICS, type MetricId } from "@/lib/market-templates";
 
 interface PageProps {
@@ -78,9 +82,10 @@ export default async function MarketPage({ params }: PageProps) {
     ? await getStartupsByFounder(market.founderXHandle!)
     : [];
 
-  const [recentBets, user] = await Promise.all([
+  const [recentBets, user, payouts] = await Promise.all([
     getBetsForMarket(market.id),
     getCurrentUser(),
+    market.status === "resolved" ? getPayoutsForMarket(market.id) : Promise.resolve(new Map<string, number>()),
   ]);
 
   const betUsers = new Map<string, Awaited<ReturnType<typeof getUserById>>>();
@@ -89,6 +94,15 @@ export default async function MarketPage({ params }: PageProps) {
       betUsers.set(bet.userId, await getUserById(bet.userId));
     }
   }
+
+  // For resolved markets, sort by profit (winners first, biggest profit first)
+  const displayBets = market.status === "resolved"
+    ? [...recentBets].sort((a, b) => {
+        const profitA = (payouts.get(a.id) ?? 0) - a.amount;
+        const profitB = (payouts.get(b.id) ?? 0) - b.amount;
+        return profitB - profitA;
+      })
+    : recentBets;
 
   const days = daysUntil(market.closesAt);
 
@@ -132,8 +146,34 @@ export default async function MarketPage({ params }: PageProps) {
   return (
     <div className="space-y-6 animate-fade-up">
       {/* Market Header */}
-      <div className="card bg-base-100 border border-base-300">
+      <div className={`card overflow-hidden bg-base-100 border ${market.status === "resolved" ? (market.resolvedOutcome === "yes" ? "border-yes/30" : "border-no/30") : "border-base-300"}`}>
         <div className="card-body gap-5 p-6">
+          {/* Resolved banner */}
+          {market.status === "resolved" && (
+            <div className={`-mx-6 -mt-6 px-6 py-4 flex items-center justify-between gap-4 ${
+              market.resolvedOutcome === "yes" ? "bg-yes/10 border-b border-yes/20" : "bg-no/10 border-b border-no/20"
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                  market.resolvedOutcome === "yes" ? "bg-yes/20" : "bg-no/20"
+                }`}>
+                  <Image src="/banana.svg" alt="" width={20} height={20} />
+                </div>
+                <div>
+                  <div className={`text-lg font-bold ${market.resolvedOutcome === "yes" ? "text-yes" : "text-no"}`}>
+                    Resolved {market.resolvedOutcome?.toUpperCase()}
+                  </div>
+                  <div className="text-xs text-base-content/40">
+                    {market.resolvedAt ? timeAgo(market.resolvedAt) : ""} &middot; <Credits amount={market.totalCredits} size="xs" className="text-base-content/40" /> distributed
+                  </div>
+                </div>
+              </div>
+              <Link href="/markets" className="btn btn-sm btn-primary btn-outline gap-1.5 shrink-0">
+                Find another bet
+              </Link>
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center gap-3">
             {isFounderMarket ? (
               <a
@@ -164,12 +204,8 @@ export default async function MarketPage({ params }: PageProps) {
               </Link>
             )}
             <span className="badge badge-neutral badge-sm">{typeLabels[market.type]}</span>
-            {market.status === "resolved" && (
-              <span className={`badge badge-sm ${
-                market.resolvedOutcome === "yes" ? "badge-success badge-outline" : "badge-error badge-outline"
-              }`}>
-                Resolved {market.resolvedOutcome?.toUpperCase()}
-              </span>
+            {market.status !== "resolved" && user?.xHandle && MODERATORS.includes(user.xHandle) && (
+              <ResolveButton marketId={market.id} />
             )}
             {!isFounderMarket && startup.xHandle && (
               <a
@@ -209,6 +245,8 @@ export default async function MarketPage({ params }: PageProps) {
                 <Clock className="h-4 w-4" />
                 {market.status === "open" ? (
                   <span>Closes in <span className="mono-num font-semibold text-base-content">{days}</span> days</span>
+                ) : market.resolvedAt ? (
+                  <span>Resolved {timeAgo(market.resolvedAt)}</span>
                 ) : (
                   <span>Closed {timeAgo(market.closesAt)}</span>
                 )}
@@ -317,11 +355,16 @@ export default async function MarketPage({ params }: PageProps) {
           <div className="space-y-4">
             <div className="card bg-base-100 border border-base-300">
               <div className="card-body p-5">
-                <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-base-content/50">Recent Bets</h3>
-                {recentBets.length > 0 ? (
+                <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-base-content/50">
+                  {market.status === "resolved" ? "Results" : "Recent Bets"}
+                </h3>
+                {displayBets.length > 0 ? (
                   <div className="space-y-3">
-                    {recentBets.map((bet) => {
+                    {displayBets.map((bet) => {
                       const betUser = betUsers.get(bet.userId);
+                      const payout = payouts.get(bet.id) ?? 0;
+                      const profit = payout - bet.amount;
+                      const isWinner = payout > 0;
                       return (
                         <div key={bet.id} className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -341,7 +384,14 @@ export default async function MarketPage({ params }: PageProps) {
                               {bet.side.toUpperCase()}
                             </span>
                           </div>
-                          <span className="mono-num text-xs text-base-content/50">{timeAgo(bet.createdAt)}</span>
+                          {market.status === "resolved" ? (
+                            <span className={`mono-num text-xs font-semibold inline-flex items-center gap-0.5 ${isWinner ? "text-yes" : "text-no"}`}>
+                              {isWinner ? `+${profit.toLocaleString()}` : `-${bet.amount.toLocaleString()}`}
+                              <Image src="/banana.svg" alt="" width={10} height={10} className="inline-block" />
+                            </span>
+                          ) : (
+                            <span className="mono-num text-xs text-base-content/50">{timeAgo(bet.createdAt)}</span>
+                          )}
                         </div>
                       );
                     })}
@@ -417,11 +467,16 @@ export default async function MarketPage({ params }: PageProps) {
             <div className="space-y-4">
               <div className="card bg-base-100 border border-base-300">
                 <div className="card-body p-5">
-                  <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-base-content/50">Recent Bets</h3>
-                  {recentBets.length > 0 ? (
+                  <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-base-content/50">
+                    {market.status === "resolved" ? "Results" : "Recent Bets"}
+                  </h3>
+                  {displayBets.length > 0 ? (
                     <div className="max-h-48 space-y-3 overflow-y-auto">
-                      {recentBets.map((bet) => {
+                      {displayBets.map((bet) => {
                         const betUser = betUsers.get(bet.userId);
+                        const payout = payouts.get(bet.id) ?? 0;
+                        const profit = payout - bet.amount;
+                        const isWinner = payout > 0;
                         return (
                           <div key={bet.id} className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -441,7 +496,14 @@ export default async function MarketPage({ params }: PageProps) {
                                 {bet.side.toUpperCase()}
                               </span>
                             </div>
-                            <span className="mono-num text-xs text-base-content/50">{timeAgo(bet.createdAt)}</span>
+                            {market.status === "resolved" ? (
+                              <span className={`mono-num text-xs font-semibold inline-flex items-center gap-0.5 ${isWinner ? "text-yes" : "text-no"}`}>
+                                {isWinner ? `+${profit.toLocaleString()}` : `-${bet.amount.toLocaleString()}`}
+                                <Image src="/banana.svg" alt="" width={10} height={10} className="inline-block" />
+                              </span>
+                            ) : (
+                              <span className="mono-num text-xs text-base-content/50">{timeAgo(bet.createdAt)}</span>
+                            )}
                           </div>
                         );
                       })}

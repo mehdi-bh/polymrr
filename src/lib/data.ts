@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   mapStartup,
   mapMarket,
@@ -472,35 +473,14 @@ export async function getOpenMarkets(): Promise<Market[]> {
 }
 
 export async function getFeaturedMarkets(): Promise<Market[]> {
-  const open = await getOpenMarkets();
-
-  const byPopularity = [...open].sort((a, b) => b.totalBettors - a.totalBettors);
-  const byClosing = [...open].sort(
-    (a, b) => new Date(a.closesAt).getTime() - new Date(b.closesAt).getTime()
-  );
-  const acquisitions = open
-    .filter((m) => m.type === "acquisition")
-    .sort((a, b) => b.totalBettors - a.totalBettors);
-
-  const picked = new Set<string>();
-  const result: Market[] = [];
-
-  function pick(source: Market[], count: number) {
-    for (const m of source) {
-      if (picked.has(m.id)) continue;
-      picked.add(m.id);
-      result.push(m);
-      if (result.length >= picked.size && picked.size >= count + (result.length - count))
-        return;
-    }
-  }
-
-  pick(byPopularity, 2);
-  pick(byClosing, 2);
-  pick(acquisitions, 2);
-  if (result.length < 6) pick(open, 6 - result.length);
-
-  return result.slice(0, 6);
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("markets")
+    .select("*")
+    .in("status", ["open", "closed", "resolved"])
+    .order("total_bettors", { ascending: false })
+    .limit(6);
+  return (data ?? []).map(mapMarket);
 }
 
 // -- Bets -------------------------------------------------------------------
@@ -513,6 +493,20 @@ export async function getBetsForMarket(marketId: string): Promise<Bet[]> {
     .eq("market_id", marketId)
     .order("created_at", { ascending: false });
   return (data ?? []).map(mapBet);
+}
+
+export async function getPayoutsForMarket(marketId: string): Promise<Map<string, number>> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("credit_transactions")
+    .select("ref_bet_id, amount")
+    .eq("ref_market_id", marketId)
+    .eq("reason", "bet_won");
+  const map = new Map<string, number>();
+  for (const row of data ?? []) {
+    if (row.ref_bet_id) map.set(row.ref_bet_id, row.amount);
+  }
+  return map;
 }
 
 export async function getBetsForUser(userId: string): Promise<Bet[]> {
