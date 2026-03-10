@@ -4,6 +4,7 @@ import { StatsBar } from "@/components/market/stats-bar";
 import { MarketCard } from "@/components/market/market-card";
 import { getFeaturedMarkets, getFeedItems, getStartupBySlug, getCurrentUser } from "@/lib/data";
 import { SignInButton } from "@/components/ui/sign-in-button";
+import { ProductHuntBadge, ProductHuntPopup } from "@/components/ui/product-hunt-badge";
 
 export default async function HomePage() {
   const [featured, feedItems, user] = await Promise.all([
@@ -32,15 +33,10 @@ export default async function HomePage() {
         <p className="text-sm text-base-content/50">
           Markets powered by TrustMRR verified data.
         </p>
-        {!user && (
-          <div className="flex flex-col items-center gap-2">
-            <SignInButton className="btn btn-primary btn-lg font-bold gap-1.5" />
-            <p className="text-xs text-base-content/40">
-              Start with 1,000 bananas now.
-            </p>
-          </div>
-        )}
+        <ProductHuntBadge />
       </div>
+
+      <ProductHuntPopup />
 
       {/* Mobile: Featured → Stats → Feed. Desktop: Stats full → Feed + Featured side by side */}
       <div className="home-grid">
