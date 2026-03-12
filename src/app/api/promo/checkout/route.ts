@@ -81,6 +81,7 @@ export async function POST(request: Request) {
         quantity: 1,
       },
     ],
+    allow_promotion_codes: true,
     metadata: { promoSlotId: String(row.id), userId: user.id },
     success_url: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.polymrr.com"}/?promo_success=1`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.polymrr.com"}/?promo_cancelled=1`,
