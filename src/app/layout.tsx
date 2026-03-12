@@ -4,7 +4,8 @@ import { Inconsolata, JetBrains_Mono, Inter, Space_Grotesk, DM_Mono } from "next
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { ToastProvider } from "@/components/ui/toast";
-import { getCurrentUser, getUserQuestCompletions } from "@/lib/data";
+import { PromoMobileBanner } from "@/components/promo/promo-mobile-banner";
+import { getCurrentUser, getUserQuestCompletions, getPromoSlots } from "@/lib/data";
 import "./globals.css";
 
 const inconsolata = Inconsolata({ variable: "--font-inconsolata", subsets: ["latin"] });
@@ -69,8 +70,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const user = await getCurrentUser();
+  const [user, promoSlots] = await Promise.all([getCurrentUser(), getPromoSlots()]);
   const completedQuests = user ? await getUserQuestCompletions(user.id) : [];
+  const slotMap = new Map(promoSlots.map((s) => [s.slotIndex, s]));
+  const mobileBannerSlots = [slotMap.get(1) ?? null, slotMap.get(2) ?? null];
 
   return (
     <html lang="en" data-theme="polymrr">
@@ -91,6 +94,7 @@ export default async function RootLayout({
           <Navbar user={user} completedQuests={completedQuests} />
           <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 pb-20 md:pb-8">{children}</main>
           <Footer />
+          <PromoMobileBanner slots={mobileBannerSlots} user={user} />
         </ToastProvider>
       </body>
     </html>

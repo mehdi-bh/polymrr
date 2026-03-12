@@ -78,13 +78,13 @@ export function PromoSlot({ slotIndex, slot, user }: PromoSlotProps) {
     <>
       <div
         onClick={() => setShowModal(true)}
-        className="group relative flex cursor-pointer items-center justify-center gap-3 rounded-xl border border-dashed border-primary/20 bg-base-100/50 px-5 py-5 transition-all hover:border-primary/40 hover:bg-base-100"
+        className="group promo-empty-slot relative flex cursor-pointer items-center justify-center gap-3 rounded-xl px-5 py-5 transition-all"
       >
         <div className="text-center">
-          <p className="text-xs font-semibold text-base-content/40 transition-colors group-hover:text-base-content/60">
+          <p className="text-sm font-bold text-base-content/70 transition-colors group-hover:text-base-content/90">
             Promote your startup here
           </p>
-          <p className="text-[10px] font-bold tracking-wide text-primary/40 transition-colors group-hover:text-primary/70">
+          <p className="mt-1 text-xs font-bold tracking-wide text-primary/70 transition-colors group-hover:text-primary">
             {STRIPE_PRICE_DISPLAY} or {BANANA_COST.toLocaleString()}{" "}
             <span className="inline-block align-middle">
               <Image

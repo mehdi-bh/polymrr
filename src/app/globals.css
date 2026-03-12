@@ -98,6 +98,54 @@
   to { width: 0%; }
 }
 
+/* Empty promo slot — animated gradient border */
+.promo-empty-slot {
+  background: var(--color-base-100);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 25%, transparent);
+  position: relative;
+}
+.promo-empty-slot::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(from var(--promo-angle, 0deg), transparent 30%, var(--color-primary) 50%, transparent 70%);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0.6;
+  animation: promo-rotate 3s linear infinite;
+  transition: opacity 0.3s;
+}
+.promo-empty-slot:hover::before {
+  opacity: 1;
+}
+.promo-empty-slot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 70%);
+  pointer-events: none;
+}
+
+@keyframes promo-rotate {
+  to { --promo-angle: 360deg; }
+}
+@property --promo-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* Mobile promo banner */
+@keyframes promo-slide {
+  0%, 40% { opacity: 1; transform: translateY(0); }
+  45%, 50% { opacity: 0; transform: translateY(-4px); }
+  55% { opacity: 0; transform: translateY(4px); }
+  60%, 100% { opacity: 1; transform: translateY(0); }
+}
+
 /* Home page grid: mobile stacks Featured→Stats→Feed, desktop shows Stats full-width then Feed|Featured */
 .home-grid {
   display: grid;
