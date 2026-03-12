@@ -1,8 +1,15 @@
-import Image from "next/image";
-import { getGlobalStats, formatCents } from "@/lib/data";
+import { getGlobalStats, getPromoSlots, getCurrentUser } from "@/lib/data";
+import { formatCents } from "@/lib/helpers";
+import { PromoSlot } from "@/components/promo/promo-slot";
 
 export async function StatsBar() {
-  const stats = await getGlobalStats();
+  const [stats, slots, user] = await Promise.all([
+    getGlobalStats(),
+    getPromoSlots(),
+    getCurrentUser(),
+  ]);
+
+  const slotMap = new Map(slots.map((s) => [s.slotIndex, s]));
 
   const items = [
     { label: "Open Markets", value: stats.openMarkets.toString() },
@@ -24,20 +31,13 @@ export async function StatsBar() {
 
       {/* Promo slots — desktop only */}
       <div className="hidden sm:grid grid-cols-2 gap-4">
-        {[1, 2].map((slot) => (
-          <div
-            key={slot}
-            className="group relative rounded-xl border border-dashed border-primary/20 bg-base-100/50 px-5 py-5 flex items-center justify-center gap-3 hover:border-primary/40 hover:bg-base-100 transition-all cursor-pointer"
-          >
-            <div className="text-center">
-              <p className="text-xs font-semibold text-base-content/40 group-hover:text-base-content/60 transition-colors">
-                Promote your startup here
-              </p>
-              <p className="text-[10px] font-bold text-primary/40 group-hover:text-primary/70 transition-colors tracking-wide">
-                100,000 <span className="inline-block align-middle"><Image src="/banana.svg" alt="bananas" width={12} height={12} className="h-3 w-3 inline -mt-0.5" /></span>
-              </p>
-            </div>
-          </div>
+        {([1, 2] as const).map((i) => (
+          <PromoSlot
+            key={i}
+            slotIndex={i}
+            slot={slotMap.get(i) ?? null}
+            user={user}
+          />
         ))}
       </div>
     </div>

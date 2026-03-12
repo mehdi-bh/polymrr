@@ -37,6 +37,8 @@ export async function GET(req: NextRequest) {
       slug: s.slug,
       name: s.name,
       icon: s.icon,
+      description: s.description,
+      website: s.website,
       mrr: s.revenue.mrr,
       totalRevenue: s.revenue.total,
     })),

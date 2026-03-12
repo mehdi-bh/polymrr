@@ -7,6 +7,7 @@ import type {
   FeedItem,
   MrrSnapshot,
   PnlSnapshot,
+  PromoSlot,
   TechStackItem,
   TrustMRRCategory,
   PaymentProvider,
@@ -140,4 +141,22 @@ export function mapMrrSnapshot(row: any): MrrSnapshot {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mapPnlSnapshot(row: any): PnlSnapshot {
   return { date: row.date, value: row.value };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapPromoSlot(row: any): PromoSlot {
+  return {
+    id: row.id,
+    slotIndex: row.slot_index,
+    userId: row.user_id ?? null,
+    startupSlug: row.startup_slug ?? null,
+    startupName: row.custom_name ?? row.startups?.name ?? null,
+    startupIcon: row.custom_icon ?? row.startups?.icon ?? null,
+    startupWebsite: row.custom_website ?? row.startups?.website ?? null,
+    tagline: row.tagline ?? "",
+    font: row.font ?? "inconsolata",
+    color: row.color ?? "#f59e0b",
+    status: row.status,
+    expiresAt: row.expires_at ?? null,
+  };
 }

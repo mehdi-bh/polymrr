@@ -163,6 +163,45 @@ export interface PnlSnapshot {
   value: number; // credits
 }
 
+// -- Promo slots --------------------------------------------------------------
+
+export type PromoFont = "inconsolata" | "inter" | "space-grotesk" | "dm-mono";
+export type PromoColor =
+  | "#f59e0b"
+  | "#10b981"
+  | "#3b82f6"
+  | "#8b5cf6"
+  | "#ef4444"
+  | "#f97316"
+  | "#06b6d4"
+  | "#ec4899";
+
+export interface PromoSlot {
+  id: number;
+  slotIndex: number;
+  userId: string | null;
+  startupSlug: string | null;
+  startupName: string | null;
+  startupIcon: string | null;
+  startupWebsite: string | null;
+  tagline: string;
+  font: PromoFont;
+  color: string;
+  status: "pending" | "active" | "expired";
+  expiresAt: string | null;
+}
+
+export interface PromoSlotDraft {
+  slotIndex: number;
+  startupSlug: string;
+  startupName: string;
+  startupIcon: string | null;
+  startupWebsite: string | null;
+  tagline: string;
+  font: PromoFont;
+  color: string;
+}
+
 /** Live feed item displayed on landing page */
 export interface FeedItem {
   id: string;

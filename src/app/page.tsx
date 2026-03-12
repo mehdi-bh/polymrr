@@ -4,7 +4,7 @@ import { StatsBar } from "@/components/market/stats-bar";
 import { MarketCard } from "@/components/market/market-card";
 import { getFeaturedMarkets, getFeedItems, getStartupBySlug, getCurrentUser } from "@/lib/data";
 import { SignInButton } from "@/components/ui/sign-in-button";
-import { ProductHuntBadge, ProductHuntPopup } from "@/components/ui/product-hunt-badge";
+import { ProductHuntBadge } from "@/components/ui/product-hunt-badge";
 
 export default async function HomePage() {
   const [featured, feedItems, user] = await Promise.all([
@@ -35,8 +35,6 @@ export default async function HomePage() {
         </p>
         <ProductHuntBadge />
       </div>
-
-      <ProductHuntPopup />
 
       {/* Mobile: Featured → Stats → Feed. Desktop: Stats full → Feed + Featured side by side */}
       <div className="home-grid">

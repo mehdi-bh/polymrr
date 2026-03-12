@@ -196,7 +196,7 @@ export function CreateMarketForm({
     if (!selectedMetric || !target) return 0;
     const val = parseFloat(target);
     if (isNaN(val)) return 0;
-    if (selectedMetric.unit === "cents") return Math.round(val * 100);
+    if (selectedMetric.unit === "cents") return Math.round(val);
     if (selectedMetric.unit === "percent") return val / 100;
     if (selectedMetric.unit === "boolean") return val;
     return val;
@@ -295,7 +295,7 @@ export function CreateMarketForm({
     setMetric(s.metric);
     setCondition(s.condition);
     if (m.unit === "cents") {
-      setTarget(String(s.target / 100));
+      setTarget(String(s.target));
     } else if (m.unit === "percent") {
       setTarget(String(s.target * 100));
     } else {

@@ -12,6 +12,7 @@ import {
   mapLeaderboardEntry,
   mapFeedItem,
   mapMrrSnapshot,
+  mapPromoSlot,
 } from "./mappers";
 import type {
   Startup,
@@ -21,6 +22,7 @@ import type {
   LeaderboardEntry,
   FeedItem,
   MrrSnapshot,
+  PromoSlot,
 } from "./types";
 
 // -- Auth -------------------------------------------------------------------
@@ -600,6 +602,29 @@ export async function getGoogleAvatarUrl(): Promise<string | null> {
   } = await supabase.auth.getUser();
   if (!authUser) return null;
   return (authUser.user_metadata?.avatar_url as string) ?? null;
+}
+
+// -- Promo Slots --------------------------------------------------------------
+
+export async function getPromoSlots(): Promise<PromoSlot[]> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("promo_slots")
+    .select("*, startups(name, icon, website)")
+    .eq("status", "active")
+    .order("slot_index");
+  return (data ?? []).map(mapPromoSlot);
+}
+
+export async function getAvailableSlotIndices(): Promise<number[]> {
+  const admin = createAdminClient();
+  const allIndices = [1, 2];
+  const { data } = await admin
+    .from("promo_slots")
+    .select("slot_index")
+    .in("status", ["active", "pending"]);
+  const taken = new Set((data ?? []).map((r: { slot_index: number }) => r.slot_index));
+  return allIndices.filter((i) => !taken.has(i));
 }
 
 // -- Helpers (pure, synchronous) — re-exported from helpers.ts for convenience
